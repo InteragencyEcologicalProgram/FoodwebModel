@@ -1,0 +1,70 @@
+---
+title: "join data"
+author: "Bobbie Flores, Data Stewarship Manager, Cramer Fish Sciences"
+date: "2025-05-19"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction:
+
+This markdown is to help data users join the DWR data collected by Cramer Fish Sciences at Dutch Slough from 2021-2023 using the Sampling Platform methodoloy.
+
+Files included in the final data package include:
+        - Metadata that links all datasets together
+                "DS_metadata_2021-2032.csv"
+        - Water quality data recorded from sonde
+                "DS_waterquality_2021-2023.csv"
+        - Zooplankton observations from recorded images
+                "DS_zoops_2021-2023.csv"
+        - Fish observations from recorded video
+                "DS_fish_2021-2023.csv"
+        - Table of included data in DWR format
+                "Food web datasets.xlsx"
+        - Readme with explanations of all data fields
+                "Readme.xlsx"
+        - This R Markdown file
+                "join data.Rmd"
+                
+*All tables join on the field "skeleton"*   
+
+NA data should be assumed to have not been collected on that day/transect, corrupt, or fell outside of acceptable QC bounds and was removed.
+
+                
+If there are any questions about the dataset or this markdown, please contact the author at bobbie.flores@fishsciences.net
+
+# Libraries:
+There is no need to load special packages for this code as originally written.
+
+# Load data
+```{r}
+metadata<-read.csv("DS_metadata_2021-2023.csv")
+waterquality<-read.csv("DS_waterquality_2021-2023.csv")
+zoop<-read.csv("DS_zoops_2021-2023.csv")
+fish<-read.csv("DS_fish_2021-2023.csv")
+```
+
+# Join data
+
+## Water quality
+```{r}
+wq<-merge(waterquality, metadata)
+```
+
+## Zoops
+```{r}
+z1<-merge(zoop, metadata)
+```
+
+## Fish
+```{r}
+f1<-merge(fish, metadata)
+```
+
+
+

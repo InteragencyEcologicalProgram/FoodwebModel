@@ -2,7 +2,7 @@
 
 library(tidyverse)
 
-DSfish = read.csv("data/dutch slough/DS_fish_2021-2023.csv") 
+DSfish = read.csv("data/dutch/DS_fish_2021-2023.csv") 
 
 test = filter(DSfish, is.na(CommonName))
 test2 = filter(DSfish, CommonName == "") %>%
@@ -12,10 +12,9 @@ test2 = filter(DSfish, CommonName == "") %>%
 fishlookup = select(DSfish, Code, CommonName) %>% distinct() %>%
   arrange(Code)
 #so there are some entries with no common name, but the code has common names for other enteries?~
+#Yer killin' me, Smalls.
 
-
-DSWQ = read.csv("data/dutch slough/DS_waterquality_2021-2023.csv")%>%
-  select(-X)
+DSWQ = read.csv("data/dutch/DS_waterquality_2021-2023.csv")
 #apparently the water quality is continuous tracks. 
 
 #grab the first point from each track to tie to the image. 
@@ -33,7 +32,7 @@ DSWQsum = group_by(DSWQ, skeleton) %>%
 DSWQmissing = filter(DSWQ, is.na(skeleton))
 #whew! none missing
 
-DSEffort = read.csv("data/dutch slough/DS_metadata_2021-2023.csv")
+DSEffort = read.csv("data/dutch/DS_metadata_2021-2023.csv")
 
 #it looks like the site and habitat type info is only inthe skeleton value, not anywhere else. 
 DSfishall = left_join(DSfish, DSEffort) %>%
@@ -60,7 +59,7 @@ ggplot(DSfishallsum, aes(x = as.factor(Date), y = Count, fill = Code)) + geom_co
   facet_wrap(~Site)+ theme(axis.text.x = element_text(angle = 90))
 
 #now the zooplankton
-DSzoops = read_csv("data/dutch slough/DS_zoops_2021-2023.csv")
+DSzoops = read_csv("data/dutch/DS_zoops_2021-2023.csv")
 
 DSzoopsall = DSzoops %>%
   left_join(DSEffort) %>%
@@ -72,15 +71,17 @@ DSzoopsall = DSzoops %>%
                           TRUE ~ "I Dunno"),
          HabitatType =  case_when(str_detect(skeleton, "NS") ~ "Near Shore",
                                   str_detect(skeleton, "OW") ~ "Open Water",
-                                  TRUE ~ "I Dunno"))
+                                  TRUE ~ "I Dunno")) 
 
 DSzoopmissing = filter(DSzoopsall, is.na(Date))
-#still missing some water quality for zoops too  
+#all accounted for!
 
-#Do we know the size of the field of view for zoops?
-#Or the volume?
-#can you see alol the critters in the zoop image? Or will the ones in the back be out of focus?
+DSzoop = pivot_longer(DSzoopsall, cols = c(total_copes,total_clads,total_amphs), names_to = "Taxon",
+                      values_to = "Count") %>%
+  mutate(CPUE = num_images*volume/1000000*Count, Date = ymd(Date))
 
+ggplot(DSzoop, aes(x = Date, y = CPUE, fill = Taxon)) +
+  facet_grid(HabitatType~Site)+ geom_area(position = "fill")
 #pictures overlap. Want to have them just far apart to we don't miss data. Calculate speed of boat and volume of wtaer.
 #percentage of net below the surface. 
 #area within the camera. 

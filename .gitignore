@@ -2,8 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
-.zip
+*.zip
 413436.csv
 data/vegetation
 GIS dta
 data/RushRanchMetadata/
+*.tif
+data/AllWetlandBugs.csv
+*.tfw

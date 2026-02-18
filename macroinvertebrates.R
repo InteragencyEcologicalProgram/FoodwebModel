@@ -67,6 +67,13 @@ AllbugsWetlands = AllBugsx %>%
   left_join(Taxonomy) %>%
   filter(!(Source == "Dutch Slough" & CPUE ==0)) #dutch slough didn't look at most stuff, so don't include all the zeros
 
+#what are the most common taxa?
+
+taxa = AllbugsWetlands %>%
+  group_by(Taxname) %>%
+  summarise(CPUE = sum(CPUE)) %>%
+  arrange(desc(CPUE))
+
 
 #let's start by just looking at amphipods
 Amphs_wetlands = filter(AllbugsWetlands, Order == "Amphipoda")
@@ -111,7 +118,7 @@ ggplot(Amphs_wetlands, aes(x = VegType, y = CPUE)) +
 
 #summarize by amphipod category
 Ampsum = group_by(Amphs_wetlands, SampleID, Source, Date, VegType, AmpType, Project_na, SalSurf, Year, Season) %>%
-  summarise(CPUE = sum(CPUE, na.tm =T))
+  summarise(CPUE = sum(CPUE, na.rm =T))
 
 ggplot(Ampsum, aes(x = VegType, y = CPUE)) +
   facet_wrap(~AmpType)+ geom_boxplot()+
@@ -135,7 +142,7 @@ plot(simulateResiduals(ampmod1))
 
 #summarize by larger categoreies
 Ampsum2 = group_by(Amphs_wetlands, SampleID, Source, Date, VegType, AmpType2, Project_na, SalSurf, Year, Season) %>%
-  summarise(CPUE = sum(CPUE, na.tm =T)) 
+  summarise(CPUE = sum(CPUE, na.rm =T)) 
 
 ampmod2 = glmmTMB(CPUE~ VegType*AmpType2+ SalSurf*AmpType2 +Season+ (1|Year), 
                ziformula = ~ SalSurf + VegType, family = "nbinom2", data = Ampsum2)
@@ -160,7 +167,7 @@ plot(simulateResiduals(ampmod2.1))
 
 #let's just look at total amphipods now. 
 Ampsum3 = group_by(Amphs_wetlands, SampleID, Source, Date, VegType,  Project_na, SalSurf, Year, Season) %>%
-  summarise(CPUE = sum(CPUE, na.tm =T))
+  summarise(CPUE = sum(CPUE, na.rm =T))
 
 ggplot(filter(Ampsum3, VegType != "Plankton"), aes(x = yday(Date), fill = VegType))+ geom_histogram() 
 
@@ -256,16 +263,19 @@ plot(allEffects(ampmod2b))
 
 #just look at hyalella
 hyalella = filter(Ampsum2, AmpType2 == "Hyalella")
+save(AllbugsWetlands, AllBugs, allsites, Amphs_wetlands, Ampsum, Ampsum2, Ampsum3, file = "data/amphipods.RData")
 
 hyalellamod = lmer(log(CPUE+1) ~ VegType+ SalSurf + I(Month^2) +(1|Year), data = hyalella)
 summary(hyalellamod)
 plot(simulateResiduals(hyalellamod))
 plot(allEffects(hyalellamod))
 testZeroInflation(hyalellamod)
+#bleh
+
 
 ggplot( filter(Ampsum2, AmpType2 == "Hyalella"), aes(x = DOY, y = CPUE))+geom_point()+
   facet_wrap(~VegType)+ scale_y_log10()+ geom_smooth()
-#I think we need a zero inflation model for Hyalella
+#definitley need a zero inflation model for Hyalella
 
 hymod2 = glmmTMB(CPUE ~  VegType+ SalSurf + Season +(1|Year), family = "nbinom2",
                  ziformula = ~SalSurf+ VegType,
@@ -274,7 +284,7 @@ hymod2 = glmmTMB(CPUE ~  VegType+ SalSurf + Season +(1|Year), family = "nbinom2"
 summary(hymod2)
 plot(simulateResiduals(hymod2))
 plot(allEffects(hymod2))
-#stilllooks gross
+#stilllooks gross, but better
 
 
 #I think we'll have to do vegetation seperate from open water
@@ -287,6 +297,7 @@ hymod3 = glmmTMB(CPUE ~  VegType+ SalSurf + Season +(1|Year), family = "nbinom2"
 summary(hymod3)
 plot(simulateResiduals(hymod3))
 plot(allEffects(hymod3))
+#wow much better~
 
 #do I need a sperate model for open water? Maybe
 #and that one outlier is really throwing stuff off
@@ -354,7 +365,7 @@ ggplot(SAVbugs, aes(x = Season, y = log(CPUE+1)))+
 #########################################
 #productivity of SAV ###################
 
-savproduction = read_excel("data/Boyer2023/Data/AV_productivity_rates_lit_values_tidy_20220216.xlsx")
+savproduction = read_excel("data/AV_productivity_rates_lit_values_tidy_20220216.xlsx")
 egeria = filter(savproduction, species == "Egeria densa")
 names(egeria)
 
@@ -516,3 +527,32 @@ ggplot(filter(Newdat, Year > 2015, Semester == "Wet"), aes(x = Year, y = Bugs, f
   geom_errorbar(aes(ymin = Bugs-sdBugs, ymax = Bugs+sdBugs), position = "dodge")+
   ylab("Total number of amphipods per site")+scale_y_log10()
 
+#what if i did the same thing for chironomids? ###########################
+
+Chiro_wetlands = filter(AllbugsWetlands, Family == "Chironomidae")%>%
+  filter(VegType != "Benthic", !is.na(Date)) %>% #remove benthic data because it was just clams
+  mutate(DOY = yday(Date), Month = month(Date), Season = case_when(Month %in% c(3,4,5) ~ "Spring",
+                                                                   Month %in% c(6,7,8) ~ "Summer",
+                                                                   Month %in% c(9,10,11) ~ "Fall",
+                                                                   Month %in% c(12,1,2) ~ "Winter"),
+        Semester = case_when(Season %in% c("Winter", "Spring") ~ "Wet",
+                                         Season %in% c("Summer", "Fall") ~ "Dry"))
+
+
+Chiro = group_by(Chiro_wetlands, SampleID, Source, Date, VegType,  Project_na, SalSurf, Year, Season, Semester) %>%
+  summarise(CPUE = sum(CPUE, na.tm =T))
+
+
+#remove random effect of year and see what happens
+chimod3vegc = glmmTMB(CPUE ~ VegType+SalSurf+Semester+ (1|Year),
+                      data = filter(Chiro, VegType %in% c("Emergent", "Floating", "Submersed")), 
+                      family = "nbinom2")
+summary(chimod3vegc)
+plot(allEffects(chimod3vegc, partial.residuals =T))
+plot(simulateResiduals(chimod3vegc))
+#gross
+
+ggplot(Chiro, aes(x = Semester, y = log(CPUE+1))) + facet_wrap(~VegType)+ geom_boxplot()
+
+
+ggplot(Chiro, aes(x = SalSurf, y =log(CPUE+1))) + facet_wrap(~VegType)+ geom_point() + geom_smooth()

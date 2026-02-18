@@ -8,7 +8,9 @@
 library(tidyverse)
 library(sf)
 library(deltamapr)
+library(chillR)
 library(spacetools)
+library(ggspatial)
 
 EMPclams = read_csv("https://pasta.lternet.edu/package/data/eml/edi/1653/1/407336fbf9a2005780935acc5f223e34") 
 GRTSclams = read_csv("https://pasta.lternet.edu/package/data/eml/edi/1653/1/8a1292d209f5ed2a7f1de1f140b0b837") 
@@ -48,6 +50,12 @@ ggplot(siusunclams, aes(x = Month, y = Total_grazing_turnover_per_day)) + geom_b
 #z is photic zone depth
 # k is vertical attenuation coefficient for PAR
 
+#Why isn't temperature in this equation? Cloern and Cole - 1983 - Lightl imitation ONLY. 
+#Mark Brush paper about not having temperature in there - early 2000s. Eppley curve. Way to estimate maximum
+#growth of phytoplnaktn as a function of temperature. 
+
+#from productivity back out a growth rate. 2002 paper stepped throught it. 
+
 #from Richardson et al . 2023, k = 0.52+(Turbidity*0.11)
 #now I just need PAR
 
@@ -84,12 +92,28 @@ ggplot(siusunclams, aes(x = Month, y = Total_grazing_turnover_per_day)) + geom_b
 # 1.96*86400sec/day = 169344/1000000 = moles/m2/day
 #this gives us a conversion rate of 0.169, which is pretty close to 0.18
 
+#check on CIMIS, is it net or othe type of solar radiation. Or total. 
+#looks like it's the average solar radiation, not total. 
+
 PAR2 = read_csv("data/CIMIS_daily.csv") %>%
-  mutate( Date = mdy(Date),
+  mutate( Date = mdy(Date), DateTime = parse_date_time(paste(Date, "1200"), orders = "ymd HM"),
           PAR = 0.45*`Sol Rad (W/sq.m)`, #Par in Watts/m2
           PAR_moles = (PAR*3.6/1000)*2.0514/1000000,
           Par_moles2 = `Sol Rad (W/sq.m)`*1.96*86400/1000000,#par in mole/m2*day maybe?
           Par_moles3= `Sol Rad (W/sq.m)`*0.18) #version used Lucas adn Thompson conversion
+
+#compare daily and hourly
+PAR_hrs = read_csv("data/CIMIS_hourly.csv") %>%
+  mutate( Date = mdy(Date), DateTime = parse_date_time(paste(Date, `Hour (PST)`), orders = "ymd HM"),
+          PAR = 0.45*`Sol Rad (W/sq.m)`, #Par in Watts/m2
+          PAR_moles = (PAR*3.6/1000)*2.0514/1000000,
+          Par_moles2 = `Sol Rad (W/sq.m)`*1.96*86400/1000000,#par in mole/m2*day maybe?
+          Par_moles3= `Sol Rad (W/sq.m)`*0.18) #version used Lucas adn Thompson conversion
+
+ggplot()+
+  geom_line(data = PAR_hrs, aes(x = DateTime, y = PAR), color = "blue")+
+  geom_line(data = PAR2, aes(x = DateTime, y = PAR), color = "red")+
+  coord_cartesian(xlim = c(ymd_hm("2019-06-01 12:00"), ymd_hm("2019-08-01 12:00")))
 
 #I'll use the Lucas and Thompson value from now on, for consistancy
 
@@ -112,15 +136,16 @@ susproductivity2 = siusunclams %>%
   left_join(select(PAR2, Date, PAR, Par_moles3)) %>%
   mutate(Productivity = (4.61*0.728*(Chlorophyll_a_ug_per_L)*Par_moles3)/(0.52+(Turbidity_NTU*0.11)), #Version from Jassby and CLeron 2002
          Carbon = (Chlorophyll_a_ug_per_L*35),
-         Productivity2 = 3.77*Par_moles3*Chlorophyll_a_ug_per_L/(0.52+(Turbidity_NTU*0.11)), #instantaneous rate of photosynthesis at a given depth
+          #instantaneous rate of photosynthesis at a given depth - need the depth integerated bit of this. 
+         Productivity2 = 3.77*Par_moles3*Chlorophyll_a_ug_per_L/(0.52+(Turbidity_NTU*0.11)),
          PhytoTurnover = Productivity2*Depth_m/Carbon,
          GrowthToGrazing = PhytoTurnover/Total_grazing_turnover_per_day, #ratio of growth rate to grazing rate
          Respiration = 0.015*35*Chlorophyll_a_ug_per_L*Depth_m + 0.15*Productivity2, #instantaneous rate of phytoplnkton biomass lost to respiration at a given depth
          NetGrowth = Productivity2 - Respiration, #growth minus resporiation at a given depth
          PhytoTurnover2 = NetGrowth*Depth_m/Carbon,
          GrowthToGrazing2 = PhytoTurnover2/Total_grazing_turnover_per_day,
-         
-         u_gross = Productivity2/Carbon, #instantaneous growth rate
+          #instantaneous growth rate - check whether depth needs to be in this
+         u_gross = Productivity2/Carbon,
          resp = u_gross*.15+0.015, 
          u_net = u_gross-resp,#instantagneous net growth rate
          u_eff = u_net- Total_grazing_rate_m3_per_m2_per_day/Depth_m, #effective growht rate (minus clam grazing.)
@@ -190,7 +215,7 @@ SP_sf_joined = SP_sf %>%
 #try to get all the sampling locatiosn in the water
 
 # Calculate the distance between each point and each polygon
-distance_matrix = as.data.frame(st_distance(st_transform(Points_fixed, crs = st_crs(WW_Delta)), WW_Delta))
+distance_matrix = as.data.frame(st_distance(st_transform(SP_sf_joined, crs = st_crs(WW_Delta)), WW_Delta))
 
 # reshape the matrix
 df_distance  =distance_matrix %>%
@@ -308,8 +333,19 @@ ggplot(susprod_sum2) + geom_col(aes(x = HNAME, y = log(zoops_not_grown)))
 #H. Phytoplankton biomass B (mg chl a/ m3) was advanced through time according to:
 #  B(t+ delta t) = B(t)exp(u_eff deltat/24)
 #where t is time in hours
+#why is it divided by 24 if it's arlready in hours?
 
 #Depth-averaged, day averaged phytoplankton net primary productivity 
 #(NPP,mgC/m2/day) was calculated as: NPP = B*u_net*H*35 
 
 #except i want 153 days. And day lenght is changing....
+daylight = daylength(38.15, c(1:365))$Daylength
+
+#datily is  better than hourly. 
+
+#Ust the continuous sondes. - maybe use a scaler for differences in chlorophyll across the marsh. 
+
+#-	Converting solar radiation to PAR correctly
+#-	Converting production rates to biomass of phytoplankton
+#-	Discrete versus continuous chlorophyll values
+#-	Probably some other questions I’ve forgotten

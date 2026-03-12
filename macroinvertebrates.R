@@ -556,3 +556,117 @@ ggplot(Chiro, aes(x = Semester, y = log(CPUE+1))) + facet_wrap(~VegType)+ geom_b
 
 
 ggplot(Chiro, aes(x = SalSurf, y =log(CPUE+1))) + facet_wrap(~VegType)+ geom_point() + geom_smooth()
+
+
+#################################################################################
+# inside versus outside ######################################################
+
+library(brms)
+load("GIS dta/wetlandsites.RData")
+#load bug data
+load("data/AllWetlandBugs_2010onwards.RData")
+names(Allbugs_Oct2025)
+
+#calculate CPUE for sweep nets
+AllBugs = Allbugs_Oct2025 %>% mutate(Volume = case_when(TowType %in% c("SN", "EAV", "SAV", "FAV") ~ 0.3,
+                                                TRUE ~ Volume),
+                             CPUE = case_when(TowType %in% c("SN", "EAV", "SAV", "FAV") ~ CPUE/0.3,
+                                              TRUE ~ CPUE))
+
+#some of the logitude values were off, fix those and join in project name
+AllBugsx = mutate(AllBugs, Longitude = case_when(Longitude >1 ~ Longitude *-1,
+                                                 TRUE ~ Longitude))%>%
+  filter(!is.na(Longitude)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = F)  %>%
+  st_join(allsites) %>%
+  st_drop_geometry()
+
+AllBugsx = filter(AllBugsx, !is.na(Project_na))
+
+allsites_1k = st_buffer(allsites, 1000)
+
+AllBugsx_outside = mutate(AllBugs, Longitude = case_when(Longitude >1 ~ Longitude *-1,
+                                                 TRUE ~ Longitude))%>%
+  filter(!is.na(Longitude)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = F)  %>%
+  st_join(allsites_1k)  %>%
+  st_drop_geometry()%>%
+  filter(!(SampleID  %in% AllBugsx$SampleID), !is.na(Project_na))
+
+
+allbugs_wetlands =  bind_rows(mutate(AllBugsx, type = "inside"),
+                              mutate(AllBugsx_outside, type = "outside"))
+
+
+table(allbugs_wetlands$Source, allbugs_wetlands$SizeClass)
+#Take out groups that don't include amphipods
+#why don't i have any ucd samples?
+
+#add any missing zeros and add up amhipods
+Amphipods = filter(allbugs_wetlands,
+                   SizeClass != "Micro", !(Source %in% c("20mm", "EMP", "FMWT", "STN") & SizeClass == "Micro")) %>%
+  pivot_wider(id_cols = c(Source, Date, Latitude, Longitude, Station, Chlorophyll, Secchi, Temperature, SalSurf, TowType, SampleID,
+                          Year, Month, Project_na, site_type, type), 
+              names_from = "Order", values_from = CPUE, values_fn = sum, values_fill =0) %>%
+  select(Source, Date, Latitude, Longitude, Station, Chlorophyll, Secchi, Temperature, SalSurf, TowType, SampleID,
+           Year, Month, Project_na, site_type, type, Amphipoda) %>%
+  mutate(Month = month(Date), Season = case_when(Month %in% c(3,4,5) ~ "Spring",
+                            Month %in% c(6,7,8) ~ "Summer",
+                            Month %in% c(9,10,11) ~ "Fall",
+                            Month %in% c(12,1,2) ~ "Winter"),
+         logCPUE = log(Amphipoda +1)) %>%
+  filter(Year %in% c(2017:2022), !is.na(type), !is.na(Project_na), !is.na(logCPUE),
+         Project_na %in% c("LICB", "Rush Ranch", "Decker", "Blacklock",
+                           "Tule Red", "Liberty", "Wings Landing", "Dutch Sl.",
+                           "Flyway Farms","Browns",
+                           "Lower Yolo Ranch"))
+
+
+m_amps <- brm(formula = logCPUE ~ type*Project_na +
+               Season + 
+               (1|Source)+
+               (1|Year),
+             data=Amphipods,
+             family=gaussian(),
+             warmup=1000,iter=3000,chains=2,cores=2,thin=10,
+             control=list(adapt_delta=0.9))
+
+summary(m_amps)
+
+
+m_amps2 = glmmTMB(logCPUE ~ type*Project_na + Season + (1|Source)+ (1|Year),
+                  data = Amphipods)
+summary(m_amps2)
+plot(allEffects(m_amps2))
+
+table(Amphipods$Project_na, Amphipods$Season)
+
+
+#things to add:
+#salinity
+#tides
+#restoration status (before after) - or just take out before samples
+
+library(lunar)
+#test it out
+dates_test = c(ymd("2025-01-01"):ymd("2025-12-12"))
+lunar.phase(ymd("2025-01-01"), shift = 8)
+lunar.phase(ymd("2025-01-01"), shift = 8, name = 8)
+
+RadsToSN = function(Rads) {
+  SpringNeap = case_when(Rads < 0.78 | Rads > 5.5 ~ "SpringTide",
+                         Rads < 3.921 & Rads > 2.361 ~ "SpringTide",
+                         TRUE ~ "NeapTide")
+  return(SpringNeap)
+  }
+
+Amphipods = mutate(Amphipods, lunarRads = lunar.phase(Date), SpringNeap = RadsToSN(lunarRads)
+                   )
+
+ggplot(Amphipods, aes(x = lunarRads, y = SpringNeap)) + geom_point()
+
+#add covariates
+m_amps3 = glmmTMB(logCPUE ~ type*Project_na + Season + SpringNeap + SalSurf +(1|Source)+ (1|Year),
+                  data = Amphipods)
+summary(m_amps3)
+plot(allEffects(m_amps3))

@@ -195,7 +195,6 @@ Cyclopoids = filter(Bugs_allfilters, Order == "Cyclopoida") %>%
   mutate(Taxon = "Cyclopoid", CPUE = case_when(is.na(CPUE) ~ 0,
                                                TRUE ~ CPUE))
   
-foo = filter(Bugs_allfilters, !SampleID  %in% Cyclopoids$SampleID)
 
 Calanoids = filter(Bugs_allfilters, Order == "Calanoida") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
@@ -273,4 +272,18 @@ Bivalves = filter(Bugs_allfilters, TowType %in% c("PVC", "PPG", "Ponar"), Class 
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #save all outputs ##############################
+save(Bugs_allfilters, file = "data/Bugs_allfilters.RData")
+save(Bivalves, file = "data/Bivalves.RData")
+save(Insects, file = "data/Insects.RData")
+save(Calanoids, file = "data/Calanoids.RData")
+save(Cyclopoids, file = "data/Cyclopoids.RData")
+save(Amphipoda, file = "data/Amphipods.RData")
+save(Cladocera, file = "data/Cladocera.RData")
 
+write.csv(Bugs_allfilters, file = "data/Bugs_allfilters.csv", row.names = F)
+write.csv(Bivalves, file = "data/Bivalves.csv", row.names = F)
+write.csv(Insects, file = "data/Insects.csv", row.names = F)
+write.csv(Calanoids, file = "data/Calanoids.csv", row.names = F)
+write.csv(Cyclopoids, file = "data/Cyclopoids.csv", row.names = F)
+write.csv(Amphipoda, file = "data/Amphipods.csv", row.names = F)
+write.csv(Cladocera, file = "data/Cladocera.csv", row.names = F)

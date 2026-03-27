@@ -1,5 +1,9 @@
 #Bug data organization and integration
 
+#this filters out all data from 2010-2024,
+#targets the wetlands with the best data,
+#and selects data from channel sites within 2 km of the wetland
+
 library(tidyverse)
 library(sf)
 library(deltamapr)
@@ -91,7 +95,24 @@ allsites_buff_2k = st_buffer(allsites, 2000)
 #   st_drop_geometry() %>%
 #   filter(!is.na(Project_na))
 
+priority_buff_2k = st_buffer(PrioritySites, 2000)%>%
+  mutate(Region = case_when(Project_na %in% c("Winter", "Browns", "Chipps") ~ "Confluence",
+                                             Project_na %in% c("Tule Red", "Ryer") ~ "Grizzly Bay",
+                                             Project_na %in% c("Decker") ~ "Decker",
+                                             Project_na == "Web Tract Berms" ~ "Web Tract Berms",
+                                             Project_na %in% c("LHT", "Liberty", "Flyway Farms", "LICB") ~ "Cache Slough")) 
+
+ggplot()+
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = priority_buff_2k, aes(fill = Region), alpha = 0.5)+
+  geom_sf(data = PrioritySites)+
+  coord_sf(xlim = c(-122.1, -121.6), ylim = c(38.0, 38.4))
+
+
+
 #exterior samples
+
+#filter samples to 2km, then calculate distance and choose the sshorter distance to apply project names
 
 outside_samples = samples %>%
   st_transform(crs = st_crs(allsites)) %>%
@@ -99,6 +120,22 @@ outside_samples = samples %>%
   st_transform(crs = st_crs(WW_Delta)) %>%
   st_join(select(WW_Delta, HNAME)) %>% 
 filter(!is.na(HNAME)) %>%
+  st_transform(crs = st_crs(PrioritySites)) 
+
+outdistances = outside_samples%>%
+  st_distance(PrioritySites) %>%
+  as.data.frame() %>%
+  mutate(SampleID = outside_samples$SampleID)
+
+names(outdistances) = c( PrioritySites$Project_na,"SampleID") 
+
+outdistances = outdistances%>%
+  pivot_longer(cols = c(Decker:LICB), names_to = "Project_na", values_to = "Distance") %>%
+  group_by(SampleID) %>%
+  filter(Distance == min(Distance)) %>%
+  distinct()
+
+outside_samples2 = outside_samples  %>%
   st_drop_geometry() %>%
   filter(Project_na %in% PrioritySites$Project_na,
          !SampleID %in% inside_all$SampleID) %>%
@@ -109,13 +146,14 @@ filter(!is.na(HNAME)) %>%
                             Project_na == "Web Tract Berms" ~ "Web Tract Berms",
                             Project_na %in% c("LHT", "Liberty", "Flyway Farms", "LICB") ~ "Cache Slough")) %>%
   select(-Project_na) %>%
-  distinct()
+  distinct() %>%
+    left_join(outdistances)
 
 
-test_oustide = st_as_sf(outside_samples, coords = c("Longitude", "Latitude"), crs = 4326)
+test_oustide = st_as_sf(outside_samples2, coords = c("Longitude", "Latitude"), crs = 4326)
 ggplot()+
   geom_sf(data = PrioritySites)+
-  geom_sf(data = test_oustide, aes(color = Region))
+  geom_sf(data = test_oustide, aes(color = Project_na, shape = Region))
 
 
 inside_priority =  inside_all%>%
@@ -123,7 +161,7 @@ inside_priority =  inside_all%>%
 
 #put them all together
 
-Bugs_spatialfilters = bind_rows(inside_priority, outside_samples) %>%
+Bugs_spatialfilters = bind_rows(inside_priority, outside_samples2) %>%
   select(-site_type, -Source) %>%
   distinct() %>%
   left_join(select(Allbugs_Mar2026,-Longitude, -Latitude), by = "SampleID")
@@ -133,7 +171,7 @@ Bugs_spatialfilters = bind_rows(inside_priority, outside_samples) %>%
 #it's a many-to-many relationshpi because one of the sample ID's is duplicated and I don't know why.
 
 #remove pre-restoration data
-restored_dates = read_excel("data/Copy of FRP_Restored_Dates.xlsx", na = "na") %>%
+restored_dates = read_excel("data/raw data/Copy of FRP_Restored_Dates.xlsx", na = "na") %>%
   rename(Project_na = Site) %>%
   select(Project_na, `Restoration Date`)
 

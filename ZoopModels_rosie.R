@@ -62,7 +62,7 @@ cal_data <- Calanoids%>%
                             Month %in% c(12,1,2) ~ "Winter"),
          Season = factor(Season, levels = c("Spring", "Summer", "Fall", "Winter")),
     yr_mo=paste(Year,Month,sep="_"),
-         wetland_yr_mo=paste(Project_na,Year,Month,sep="_"),
+         wetland_na_yr_mo=paste(Project_na,Year,Month,sep="_"),
          wetland_yr_sea=paste(Project_na,Year,Season,sep="_"),
     
     Reagion_yr_sea=paste(Region,Year,Season,sep="_"),
@@ -79,57 +79,14 @@ calexplore <- cal_data%>%
   summarise(n=n())%>%
   spread(Year,n)
 
-clad_data <- allbugs3%>%
-  group_by(Project_na) %>%
-  filter(all(c("Inside", "Outside_1k") %in% Type)) %>%
-  ungroup()%>%
-  mutate(yr_mo=paste(year,month,sep="_"),
-         Project_na_yr_mo=paste(Project_na,year,month,sep="_"),
-         wetland_yr_sea=paste(Project_na,year,sea,sep="_"),
-         wetland_yr=paste(Project_na,year,sep="_"))%>%
-  group_by(wetland_yr_sea) %>%
-  filter(all(c("Inside", "Outside_1k") %in% Type)) %>%
-  ungroup()%>%
-  mutate(logCPUE=log10(CPUE))%>%
-  filter(Lifestage=="Adult",SizeClass=="Meso",Order=="Cladocera",year>2016,year<2023,
-         site_type!="Planned",
-         !Wetland%in%c("Arnold Sl.","Lookout Sl.","Dutch Sl."),
-         !is.na(CPUE))
-
-cyc_data <- allbugs3%>%
-  group_by(Wetland) %>%
-  filter(all(c("Inside", "Outside_1k") %in% Type)) %>%
-  ungroup()%>%
-  mutate(yr_mo=paste(year,month,sep="_"),
-         wetland_yr_mo=paste(Wetland,year,month,sep="_"),
-         wetland_yr_sea=paste(Wetland,year,sea,sep="_"),
-         wetland_yr=paste(Wetland,year,sep="_"))%>%
-  group_by(wetland_yr_sea) %>%
-  filter(all(c("Inside", "Outside_1k") %in% Type)) %>%
-  ungroup()%>%
-  mutate(logCPUE=log10(CPUE))%>%
-  filter(Lifestage=="Adult",SizeClass=="Meso",Order=="Cyclopoida",year>2016,year<2023,
-         site_type!="Planned",
-         !Wetland%in%c("Arnold Sl.","Lookout Sl."),
-         !is.na(CPUE))
 
 ####run example model####
 
-#figure out how to get reagion in here
-m_cal <- brm(formula = CPUE ~ Type + 
-               Region+
-               Season + 
-               (1|Source)+
-               (1|Year),
-             data=cal_data,
-             family=Gamma(link="log"),
-             warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-             control=list(adapt_delta=0.99))
-#"Family gamma requires resposne greater than 9
-#maybe hurdle lognormal?
+#We can do this with log-transformed CPUE or a hurdle lognormal model
+#I haven't quite figured out the best way to deal with "project" and "region"
 
 m_cal2 <- brm(formula = logCPUE ~ Type + 
-               Region +
+               Region +Project_na+
                Season + 
                (1|Source)+
                (1|Year),
@@ -138,45 +95,21 @@ m_cal2 <- brm(formula = logCPUE ~ Type +
              warmup=1000,iter=3000,chains=3,cores=3,thin=10,
              control=list(adapt_delta=0.99))
 
-m_cal3 <- brm(formula = Calanoida+1 ~ Type*Project_na +
-                sea + 
-                (1|Source)+
-                (1|year),
+m_cal3 <- brm(formula =  bf(CPUE ~ Type*Project_na +
+                              Region + 
+                              (1|Source)+
+                              (1|Year),
+                            hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
               data=cal_data,
-              family=lognormal(),
+              family=hurdle_lognormal(),
               warmup=1000,iter=3000,chains=3,cores=3,thin=10,
               control=list(adapt_delta=0.99))
 
-m_cal3.1 <- brm(formula = logCPUE ~ Type*Project_na +
-                sea + 
-                (1|Source)+
-                (1|year),
-              data=cal_data,
-              family=gaussian(),
-              warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-              control=list(adapt_delta=0.99))
 
-m_clad <- brm(formula = logCPUE ~ Type*Project_na +
-                sea + 
-                (1|Source)+
-                (1|year),
-              data=clad_data,
-              family=gaussian(),
-              warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-              control=list(adapt_delta=0.99))
 
-m_cyc <- brm(formula = logCPUE ~ Type*Project_na +
-                sea + 
-                (1|Source)+
-                (1|year),
-              data=cyc_data,
-              family=gaussian(),
-              warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-              control=list(adapt_delta=0.99))
 
-#write_brmsfit(m_cal3,"fit_cal3.rds")
-write_brmsfit(m_clad,"fit_clad.rds")
-write_brmsfit(m_cyc,"fit_cyc.rds")
+write_brmsfit(m_cal3,"fit_cal3.rds")
+
 
 #### example exploration of model output ####
 #look at model summary
@@ -185,16 +118,13 @@ plot(m_cal3)
 mcmc_plot(m_cal3)
 plot(conditional_effects(m_cal3),theme=theme_bw())
 
-summary(m_cal3.1)
-plot(m_cal3.1)
-mcmc_plot(m_cal3.1)
-plot(conditional_effects(m_cal3.1),theme=theme_bw())
+#compare to the gaussian version
+summary(m_cal2)
+plot(m_cal2)
+mcmc_plot(m_cal2)
+plot(conditional_effects(m_cal2),theme=theme_bw())
 
 
-summary(m_clad)
-plot(m_clad)
-mcmc_plot(m_clad)
-plot(conditional_effects(m_clad),theme=theme_bw())
 
 #posterior prediction check
 pp_check(m_cal3)
@@ -228,9 +158,9 @@ brmtest %>%
   spread_draws(r_WY[WY], sd_WY__Intercept) %>%
   head(15)
 
-r_draws <- m_cal3.1 %>%
+r_draws <- m_cal3 %>%
   spread_draws(r_year[year], sd_year__Intercept) 
-r_draws2 <- m_cal3.1 %>%
+r_draws2 <- m_cal3 %>%
   spread_draws(r_Source[Source], sd_Source__Intercept) 
 
 ggplot(data=r_draws2,aes(x = r_Source, y = Source)) +
@@ -240,113 +170,73 @@ ggplot(data=r_draws,aes(x = r_year, y = year)) +
   stat_halfeye(aes(group=year))+
   theme_bw()
 
-#### Data prep ####
-bug_data <- allbugs3%>%
-  group_by(Project_na) %>%
-  filter(all(c("Inside", "Outside_1k") %in% Type)) %>%
-  ungroup()%>%
-  mutate(yr_mo=paste(year,month,sep="_"),
-         wetland_yr_mo=paste(Wetland,year,month,sep="_"),
-         wetland_yr_sea=paste(Wetland,year,sea,sep="_"),
-         wetland_yr=paste(Wetland,year,sep="_"))%>%
-  group_by(wetland_yr_sea) %>%
-  filter(all(c("Inside", "Outside_1k") %in% Type)) %>%
-  ungroup()%>%
-  group_by(Type,Wetland,sea,Source,year,Order,Lifestage,SizeClass,site_type)%>%
-  summarise(CPUE=sum(CPUE))%>%
-  spread(Order,CPUE)%>%
-  filter(Lifestage=="Adult",SizeClass=="Meso",year>2016,year<2023,
-         site_type!="Planned",
-         !Wetland%in%c("Arnold Sl.","Lookout Sl.","Dutch Sl."))
+#### mor calanoid models ####
 
-bug_data[is.na(bug_data)] <- 0
-
-bug_data$logCPUE_cal <- log10((bug_data$Calanoida)+1)
-bug_data$logCPUE_clad <- log10((bug_data$Cladocera)+1)
-bug_data$logCPUE_cyc <- log10((bug_data$Cyclopoida)+1)
-
-region <- data.frame(Wetland=unique(bug_data$Wetland),
-                     Region=c("Suisun","Suisun","Confluence","Delta","Cache",
-                              "Cache","Cache","Cache","Cache","Suisun",
-                              "SBay","SBay","Delta","Suisun","Confluence"))
-
-bug_data <- left_join(bug_data,region)
-
-
-#### Calanoida ####
-m_cal_v1g <- brm(formula = Calanoida ~ Type*Wetland +
-                  sea + 
+#compare gamma to lognormal
+m_cal_v1g <- brm(formula = CPUE ~ Type*Project_na +
+                  Season + 
                   (1|Source)+
-                  (1|year),
-                data=bug_data,
+                  (1|Year),
+                data=cal_data,
                 family=hurdle_gamma(link = "log"),
                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                 control=list(adapt_delta=0.99))
+#all sorts of nasty warning messages. running the chains with more itterations might help
 
-m_cal_v1l <- brm(formula = Calanoida ~ Type*Wetland +
-                   sea + 
+m_cal_v1l <- brm(formula = CPUE ~ Type*Project_na +
+                   Season + 
                    (1|Source)+
-                   (1|year),
-                 data=bug_data,
+                   (1|Year),
+                 data=cal_data,
                  family=hurdle_lognormal(),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                 warmup=1000,iter=6000,chains=3,cores=3,thin=10,
                  control=list(adapt_delta=0.99))
-
-m_cal_v1g1 <- brm(formula = Calanoida+0.01 ~ Type*Wetland +
-                   sea + 
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=Gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-
-m_cal_v2 <- brm(formula = Calanoida ~ Type*Region +
-                  sea + 
-                  (1|Wetland)+
+#more nasty warning messages. running the chains with more itterations might help
+m_cal_v2 <- brm(formula = CPUE~ Type*Region +
+                  Season + 
+                  (1|Project_na)+
                   (1|Source)+
-                  (1|year),
-                data=bug_data,
+                  (1|Year),
+                data=cal_data,
                 family=hurdle_gamma(link = "log"),
                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                 control=list(adapt_delta=0.99))
 
-m_cal_v3 <- brm(formula = Calanoida ~ Region +
-                  sea + 
-                  #(1|Wetland)+
+m_cal_v3 <- brm(formula = CPUE ~ Region +
+                  Season+ 
+                  #(1|Project_na)+
                   (1|Source)+
-                  (1|year),
-                data=bug_data,
+                  (1|Year),
+                data=cal_data,
                 family=hurdle_gamma(link = "log"),
                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                 control=list(adapt_delta=0.99))
 
-m_cal_v4 <- brm(formula = Calanoida ~ sea +
+m_cal_v4 <- brm(formula = CPUE~ Season+
                   #sea + 
-                  #(1|Wetland)+
+                  #(1|Project_na)+
                   (1|Source)+
-                  (1|year),
-                data=bug_data,
+                  (1|Year),
+                data=cal_data,
                 family=hurdle_gamma(link = "log"),
                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                 control=list(adapt_delta=0.99))
 
-m_cal_v5 <- brm(formula = Calanoida ~ Wetland +
-                  sea + 
+m_cal_v5 <- brm(formula = CPUE~ Project_na +
+                  Season + 
                   #(1|Region)+
                   (1|Source)+
-                  (1|year),
-                data=bug_data,
+                  (1|Year),
+                data=cal_data,
                 family=hurdle_gamma(link = "log"),
                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                 control=list(adapt_delta=0.99))
 
-m_cal_v6 <- brm(formula = Calanoida ~ Type + Wetland +
-                   sea + 
+m_cal_v6 <- brm(formula = Calanoida ~ Type + Project_na +
+                   Season + 
                    (1|Source)+
-                   (1|year),
-                 data=bug_data,
+                   (1|Year),
+                 data=cal_data,
                  family=hurdle_gamma(link = "log"),
                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                  control=list(adapt_delta=0.99))
@@ -357,16 +247,18 @@ summary(m_cal_v2)
 summary(m_cal_v3)
 summary(m_cal_v4)
 
-bp_calv1 <- mean(apply(posterior_predict(m_cal_v1g, draws = 1000), 1, mean) >= mean(bug_data$Calanoida)) #T_rep >= T_obs
-#bp_calv1b <- mean(apply(posterior_predict(m_cal_v1l, draws = 1000), 1, mean) >= mean(bug_data$Calanoida)) #T_rep >= T_obs
-#bp_calv1c <- mean(apply(posterior_predict(m_cal_v1g1, draws = 1000), 1, mean) >= mean(bug_data$Calanoida+0.01)) #T_rep >= T_obs
-bp_calv2 <- mean(apply(posterior_predict(m_cal_v2, draws = 1000), 1, mean) >= mean(bug_data$Calanoida)) #T_rep >= T_obs
-bp_calv3 <- mean(apply(posterior_predict(m_cal_v3, draws = 1000), 1, mean) >= mean(bug_data$Calanoida)) #T_rep >= T_obs
-bp_calv4 <- mean(apply(posterior_predict(m_cal_v4, draws = 1000), 1, mean) >= mean(bug_data$Calanoida)) #T_rep >= T_obs
-bp_calv5 <- mean(apply(posterior_predict(m_cal_v4, draws = 1000), 1, mean) >= mean(bug_data$Calanoida)) #T_rep >= T_obs
+#Note from Rosie: This is as far as I got. I haven't done anything else. 
+
+bp_calv1 <- mean(apply(posterior_predict(m_cal_v1g, draws = 1000), 1, mean) >= mean(cal_data$CPUE)) #T_rep >= T_obs
+#bp_calv1b <- mean(apply(posterior_predict(m_cal_v1l, draws = 1000), 1, mean) >= mean(cal_data$CPUE)) #T_rep >= T_obs
+#bp_calv1c <- mean(apply(posterior_predict(m_cal_v1g1, draws = 1000), 1, mean) >= mean(cal_data$CPUE+0.01)) #T_rep >= T_obs
+bp_calv2 <- mean(apply(posterior_predict(m_cal_v2, draws = 1000), 1, mean) >= mean(cal_data$CPUE)) #T_rep >= T_obs
+bp_calv3 <- mean(apply(posterior_predict(m_cal_v3, draws = 1000), 1, mean) >= mean(cal_data$CPUE)) #T_rep >= T_obs
+bp_calv4 <- mean(apply(posterior_predict(m_cal_v4, draws = 1000), 1, mean) >= mean(cal_data$CPUE)) #T_rep >= T_obs
+bp_calv5 <- mean(apply(posterior_predict(m_cal_v4, draws = 1000), 1, mean) >= mean(cal_data$CPUE)) #T_rep >= T_obs
 
 #model comparison
-loo(m_cal_v1)
+loo(m_cal_v1l)
 loo(m_cal_v2)
 loo(m_cal_v3)
 loo(m_cal_v4)
@@ -377,184 +269,31 @@ m_cal_v4 <- add_criterion(m_cal_v4, "loo")
 m_cal_v5 <- add_criterion(m_cal_v5, "loo")
 
 loo_compare(m_cal_v1g,m_cal_v2,m_cal_v3,m_cal_v4,m_cal_v5)
-waic(m_cal_v1,m_cal_v2,m_cal_v3)
+waic(m_cal_v1g,m_cal_v2,m_cal_v3)
 model_weights(m_cal_v1g,m_cal_v2,m_cal_v3,m_cal_v4,m_cal_v5,weights="loo")
 
 
 #how much variability is there in your random effect?
 cal_r_draws <- m_cal_v1g %>%
-  spread_draws(r_year[year], sd_year__Intercept) 
+  spread_draws(r_year[Year], sd_year__Intercept) 
 cal_r_draws2 <- m_cal_v1g %>%
   spread_draws(r_Source[Source], sd_Source__Intercept) 
 
 ggplot(data=cal_r_draws2,aes(x = r_Source, y = Source)) +
   stat_halfeye(aes(group=Source))+
   theme_bw()
-ggplot(data=cal_r_draws,aes(x = r_year, y = year)) +
-  stat_halfeye(aes(group=year))+
+ggplot(data=cal_r_draws,aes(x = r_year, y = Year)) +
+  stat_halfeye(aes(group=Year))+
   theme_bw()
 
 #coefficient draws
 
-
-
-#### Cladocera ####
-m_clad_v1 <- brm(formula = Cladocera ~ Type*Wetland +
-                   sea + 
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=hurdle_gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-m_clad_v2 <- brm(formula = Cladocera ~ Type*Region +
-                  sea + 
-                  #(1|Wetland)+
-                  (1|Source)+
-                  (1|year),
-                data=bug_data,
-                family=hurdle_gamma(link = "log"),
-                warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                control=list(adapt_delta=0.99))
-
-m_clad_v3 <- brm(formula = Cladocera ~ Region +
-                  sea + 
-                  #(1|Wetland)+
-                  (1|Source)+
-                  (1|year),
-                data=bug_data,
-                family=hurdle_gamma(link = "log"),
-                warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                control=list(adapt_delta=0.99))
-
-m_clad_v4 <- brm(formula = Cladocera ~ sea +
-                  #sea + 
-                  #(1|Wetland)+
-                  (1|Source)+
-                  (1|year),
-                data=bug_data,
-                family=hurdle_gamma(link = "log"),
-                warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                control=list(adapt_delta=0.99))
-
-m_clad_v5 <- brm(formula = Cladocera ~ Wetland +
-                  sea + 
-                  #(1|Region)+
-                  (1|Source)+
-                  (1|year),
-                data=bug_data,
-                family=hurdle_gamma(link = "log"),
-                warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                control=list(adapt_delta=0.99))
-
-m_clad_v1 <- add_criterion(m_clad_v1, "loo")
-m_clad_v2 <- add_criterion(m_clad_v2, "loo")
-m_clad_v3 <- add_criterion(m_clad_v3, "loo")
-m_clad_v4 <- add_criterion(m_clad_v4, "loo")
-m_clad_v5 <- add_criterion(m_clad_v5, "loo")
-
-loo_compare(m_clad_v1,m_clad_v2,m_clad_v3,m_clad_v4,m_clad_v5)
-#waic(m_clad_v1,m_clad_v2,m_clad_v3)
-model_weights(m_clad_v1,m_clad_v2,m_clad_v3,m_clad_v4,m_clad_v5,weights="loo")
-
-#how much variability is there in your random effect?
-clad_r_draws <- m_clad_v1 %>%
-  spread_draws(r_year[year], sd_year__Intercept) 
-clad_r_draws2 <- m_clad_v1 %>%
-  spread_draws(r_Source[Source], sd_Source__Intercept) 
-
-ggplot(data=clad_r_draws2,aes(x = r_Source, y = Source)) +
-  stat_halfeye(aes(group=Source))+
-  theme_bw()
-ggplot(data=clad_r_draws,aes(x = r_year, y = year)) +
-  stat_halfeye(aes(group=year))+
-  theme_bw()
-
-#predictions
-
-
-#### Cyclopoida ####
-m_cyc_v1 <- brm(formula = Cyclopoida ~ Type*Wetland +
-                   sea + 
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=hurdle_gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-m_cyc_v2 <- brm(formula = Cyclopoida ~ Type*Region +
-                   sea + 
-                   #(1|Wetland)+
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=hurdle_gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-m_cyc_v3 <- brm(formula = Cyclopoida ~ Region +
-                   sea + 
-                   #(1|Wetland)+
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=hurdle_gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-m_cyc_v4 <- brm(formula = Cyclopoida ~ sea +
-                   #sea + 
-                   #(1|Wetland)+
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=hurdle_gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-m_cyc_v5 <- brm(formula = Cyclopoida ~ Wetland +
-                   sea + 
-                   #(1|Region)+
-                   (1|Source)+
-                   (1|year),
-                 data=bug_data,
-                 family=hurdle_gamma(link = "log"),
-                 warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                 control=list(adapt_delta=0.99))
-
-m_cyc_v1 <- add_criterion(m_cyc_v1, "loo")
-m_cyc_v2 <- add_criterion(m_cyc_v2, "loo")
-m_cyc_v3 <- add_criterion(m_cyc_v3, "loo")
-m_cyc_v4 <- add_criterion(m_cyc_v4, "loo")
-m_cyc_v5 <- add_criterion(m_cyc_v5, "loo")
-
-loo_compare(m_cyc_v1,m_cyc_v2,m_cyc_v3,m_cyc_v4,m_cyc_v5)
-#waic(m_cyc_v1,m_cyc_v2,m_cyc_v3)
-model_weights(m_cyc_v1,m_cyc_v2,m_cyc_v3,m_cyc_v4,m_cyc_v5,weights="loo")
-
-#how much variability is there in your random effect?
-cyc_r_draws <- m_cyc_v1 %>%
-  spread_draws(r_year[year], sd_year__Intercept) 
-cyc_r_draws2 <- m_cyc_v1 %>%
-  spread_draws(r_Source[Source], sd_Source__Intercept) 
-
-ggplot(data=cyc_r_draws2,aes(x = r_Source, y = Source)) +
-  stat_halfeye(aes(group=Source))+
-  theme_bw()
-ggplot(data=cyc_r_draws,aes(x = r_year, y = year)) +
-  stat_halfeye(aes(group=year))+
-  theme_bw()
-
-
-
 #### combine predictions and r_draws ####
 predgrid <- expand.grid(
-  Wetland = unique(bug_data$Wetland),
+  Project_na = unique(bug_data$Project_na),
   Type = unique(bug_data$Type)
 )%>%
-  mutate(sea="Spring")
+  mutate(Season="Spring")
 
 
 preds_combined <- bind_rows(
@@ -705,7 +444,7 @@ ggplot(b_summ%>%
 
 #generate higher resolution of predictions as desired
 predgrid <- expand.grid(
-  Wetland = unique(cal_data$Wetland),
+  Project_na = unique(cal_data$Project_na),
   Type = unique(cal_data$Type)
   )%>%
   mutate(sea="Spring")
@@ -715,7 +454,7 @@ plot(pred3)  # quick plot
 
 #generate higher resolution of predictions as desired
 predgrid_clad <- expand.grid(
-  Wetland = unique(clad_data$Wetland),
+  Project_na = unique(clad_data$Project_na),
   Type = unique(clad_data$Type)
 )%>%
   mutate(sea="Spring")

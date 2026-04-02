@@ -74,11 +74,6 @@ cal_data <- Calanoids%>%
 unique(cal_data%>%
          select(Type,Project_na, Region))
 
-calexplore <- cal_data%>%
-  group_by(Project_na,Type,Year)%>%
-  summarise(n=n())%>%
-  spread(Year,n)
-
 
 ####run example model####
 
@@ -242,6 +237,7 @@ m_cal_v6 <- brm(formula = Calanoida ~ Type + Project_na +
                  control=list(adapt_delta=0.99))
 
 #model test
+summary(m_cal_v1l)
 summary(m_cal_v1g)
 summary(m_cal_v2)
 summary(m_cal_v3)

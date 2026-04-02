@@ -325,3 +325,55 @@ write.csv(Calanoids, file = "data/Calanoids.csv", row.names = F)
 write.csv(Cyclopoids, file = "data/Cyclopoids.csv", row.names = F)
 write.csv(Amphipoda, file = "data/Amphipods.csv", row.names = F)
 write.csv(Cladocera, file = "data/Cladocera.csv", row.names = F)
+
+
+#exploritory plots of each dataset ################################
+load("data/Bivalves.RData")
+
+Biv = st_as_sf(Bivalves, coords = c("Longitude", "Latitude"), crs = 4326)
+
+ggplot(Biv) +
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites, aes(fill = Project_na))+
+  geom_sf()+
+  coord_sf(ylim = c(38, 38.35), xlim = c(-122.1, -121.56))
+
+ggplot(Bivalves, aes(x = as.factor(Year), fill = Type)) + geom_histogram(stat = "count")+
+  facet_wrap(~Project_na)
+
+load("data/Amphipods.RData")
+Amph = st_as_sf(Amphipoda, coords = c("Longitude", "Latitude"), crs = 4326)
+
+ggplot(Amph) +
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites, aes(fill = Project_na))+
+  geom_sf()+
+  coord_sf(ylim = c(38, 38.35), xlim = c(-122.1, -121.56))
+
+ggplot(Amphipoda, aes(x = as.factor(Year), fill = Type)) + geom_histogram(stat = "count")+
+  facet_wrap(~Project_na)
+
+load("data/Calanoids.RData")
+Cal= st_as_sf(Calanoids, coords = c("Longitude", "Latitude"), crs = 4326)
+
+ggplot(Cal) +
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites, aes(fill = Project_na))+
+  geom_sf()+
+  coord_sf(ylim = c(38, 38.35), xlim = c(-122.1, -121.56))
+
+ggplot(Calanoids, aes(x = as.factor(Year), fill = Type)) + geom_histogram(stat = "count")+
+  facet_wrap(~Project_na)
+
+
+load("data/Insects.RData")
+Ins= st_as_sf(Insects, coords = c("Longitude", "Latitude"), crs = 4326)
+
+ggplot(Ins) +
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites, aes(fill = Project_na))+
+  geom_sf()+
+  coord_sf(ylim = c(38, 38.35), xlim = c(-122.1, -121.56))
+
+ggplot(Insects, aes(x = as.factor(Year), fill = Type)) + geom_histogram(stat = "count")+
+  facet_wrap(~Project_na)

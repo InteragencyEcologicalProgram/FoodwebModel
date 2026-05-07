@@ -57,8 +57,9 @@ load("data/Amphipods.RData")
 glimpse(Amphipoda)
 
 gamarid_data <- Amphipoda%>%
-  filter(AmphGroup == "Gammaridae and friends") %>%
-  mutate(Season = case_when(Month %in% c(3,4,5)~ "Spring",
+  filter(AmphGroup == "Gammaridae and friends", SizeClass == "Macro") %>%
+  mutate(Month = month(Date),
+    Season = case_when(Month %in% c(3,4,5)~ "Spring",
                             Month %in% c(6,7,8) ~ "Summer",
                             Month %in% c(9,10,11) ~ "Fall",
                             Month %in% c(12,1,2) ~ "Winter"),
@@ -72,16 +73,33 @@ gamarid_data <- Amphipoda%>%
          logCPUE = log(CPUE+1)) %>%
   ungroup()
 
+unique(Amphipoda$Project_na)
 
 
 unique(gamarid_data%>%
          select(Type,Project_na, Region)) 
 
+#exploritory plots
+
+ggplot(gamarid_data, aes(x = Year, y = logCPUE, color = Project_na))+
+  facet_grid(Season ~ Type)+ geom_point()
+
+#very little winter data
+
+ggplot(gamarid_data, aes(x = Year, y = logCPUE, color = Project_na))+
+  facet_grid(Region ~ Type)+ geom_point()
+
+
+ggplot(gamarid_data, aes(x = SalSurf, y = logCPUE, color = Project_na))+
+  facet_wrap(~Region, scales = "free_x")+ geom_point()+ geom_smooth()
+#that looks ugly
 
 ####run example model####
 
 #We can do this with log-transformed CPUE or a hurdle lognormal model
 #I haven't quite figured out the best way to deal with "project" and "region"
+cachedata = filter(gamarid_data, Region ==  "Cache Slough", !is.na(Season), !is.na(Source),
+                   !is.na(Year), !is.na(logCPUE), !is.na(Type))
 
 m_gamarid2 <- brm(formula = logCPUE ~ Type + 
                 #Region +
@@ -124,7 +142,7 @@ m_gamarid3 <- brm(formula =  bf(CPUE ~ Type*Project_na +
 
 
 
-
+write_brmsfit(m_gamarid2,"fit_m_gamarid2.rds")
 write_brmsfit(m_gamarid3,"fit_m_gamarid3.rds")
 
 
@@ -142,49 +160,86 @@ summary(m_gamarid2)
 plot(m_gamarid2)
 mcmc_plot(m_gamarid2)
 plot(conditional_effects(m_gamarid2),theme=theme_bw())
-
+pp_check(m_gamarid2, type = "loo_pit_overlay")
 
 
 #posterior prediction check
-pp_check(m_cal3)
-pp_check(m_cal3, type = "stat", stat = "mean")
+pp_check(m_gamarid3)
+pp_check(m_gamarid3, type = "stat", stat = "mean")
 
 #bayesian p - target is ~ 0.5
-T_obs <- mean(cal_data$logCPUE)
-T_rep <- apply(posterior_predict(m_cal3.1, draws = 1000), 1, mean)
+T_obs <- mean(gamarid_data$logCPUE)
+T_rep <- apply(posterior_predict(m_gamarid3, draws = 1000), 1, mean)
 bayes_p <- mean(T_rep >= T_obs)     # Proportion of times T_rep >= T_obs
 
 #region of practical equivalence (ROPE)
 # - user defined ROPE - how much of prob. distribution overlaps
 # with a 'negligible effect size', "not zero, but basically meaningless"
-rope_result <- rope(m_cal, range = c(-0.1, 0.1))
+rope_result <- rope(m_gamarid3, range = c(-0.1, 0.1))
 rope_result
+# 
 
 #probability of direction (max probability of effect)
 # - probability that parameter is strictly positive/negative, 
 # analog to p-value for individual estimates
-ppd <- p_direction(brmtest)
+ppd <- p_direction(m_gamarid3)
 ppd
 
 
+
 #model comparison
-waic(brmtest,brmtest2)
-loo(brmtest,brmtest2)
+waic(m_gamarid3,m_gamarid2)
+loo(m_gamarid3,m_gamarid2)
 
 #how much variability is there in your random effect?
 #if random effect
-brmtest %>%
-  spread_draws(r_WY[WY], sd_WY__Intercept) %>%
+m_gamarid3 %>%
+  spread_draws(r_Year[Year], sd_Year__Intercept) %>%
   head(15)
 
-r_draws <- m_cal3 %>%
-  spread_draws(r_year[year], sd_year__Intercept) 
-r_draws2 <- m_cal3 %>%
+r_draws <- m_gamarid3 %>%
+  spread_draws(r_Year[Year], sd_Year__Intercept) 
+r_draws2 <- m_gamarid3 %>%
   spread_draws(r_Source[Source], sd_Source__Intercept) 
 
 ggplot(data=r_draws2,aes(x = r_Source, y = Source)) +
   stat_halfeye(aes(group=Source))+
   theme_bw()
-ggplot(data=r_draws,aes(x = r_year, y = year)) +
-  stat_halfeye(aes(group=year))+
+ggplot(data=r_draws,aes(x = r_Year, y = Year)) +
+  stat_halfeye(aes(group=Year))+
   theme_bw()
+
+
+m_gamarid4 <- brm(formula =  bf(CPUE ~ Type*Project_na +
+                                   Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=gamarid_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))
+warnings(m_gamarid4)
+
+m_gamarid5 <- brm(formula =  bf(CPUE ~ Type + Project_na +
+                                  Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=gamarid_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))
+#tons of warnings. 
+loo(m_gamarid4,m_gamarid5)
+
+
+m_gamarid6 <- brm(formula =  bf(CPUE ~ Type+Project_na + Season +
+                                  # Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=filter(gamarid_data, Region ==  "Cache Slough"),
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))

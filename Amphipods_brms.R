@@ -220,9 +220,20 @@ m_gamarid4 <- brm(formula =  bf(CPUE ~ Type*Project_na +
                   warmup=1000,iter=5000,chains=3,cores=3,thin=10,
                   control=list(adapt_delta=0.99))
 warnings(m_gamarid4)
+#that's really bad. Why  so bad?
 
-m_gamarid5 <- brm(formula =  bf(CPUE ~ Type + Project_na +
-                                  Region + 
+m_gamarid4.1 <- brm(formula =  bf(CPUE ~ Type*Project_na +
+                                  #Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=filter(gamarid_data, !Region %in% c( "Decker","Web Tract Berms"), Season != "Winter"),
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=5000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))
+#so having region and project gives the problem. Which makes sense becasue each project is only in one region
+
+m_gamarid5 <- brm(formula =  bf(CPUE ~ Type*Region + 
                                   (1|Source)+
                                   (1|Year),
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
@@ -230,16 +241,140 @@ m_gamarid5 <- brm(formula =  bf(CPUE ~ Type + Project_na +
                   family=hurdle_lognormal(),
                   warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                   control=list(adapt_delta=0.99))
-#tons of warnings. 
-loo(m_gamarid4,m_gamarid5)
+#oh, way better 
+
+summary(m_gamarid5)
+plot(m_gamarid5)
+mcmc_plot(m_gamarid5)
+plot(conditional_effects(m_gamarid5),theme=theme_bw())
+pp_check(m_gamarid5, type = "loo_pit_overlay")
+# really need to figure out what this means. 
+
+m_gamarid5.1 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=gamarid_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))
+#oh, way better 
+
+summary(m_gamarid5.1)
+plot(m_gamarid5.1)
+mcmc_plot(m_gamarid5.1)
+plot(conditional_effects(m_gamarid5.1),theme=theme_bw())
+pp_check(m_gamarid5.1, type = "loo_pit_overlay")
+# really need to figure out what this means. 
 
 
-m_gamarid6 <- brm(formula =  bf(CPUE ~ Type+Project_na + Season +
+
+
+
+
+m_gamarid6 <- brm(formula =  bf(CPUE ~ Type+Region + Season +
                                   # Region + 
                                   (1|Source)+
                                   (1|Year),
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
-                  data=filter(gamarid_data, Region ==  "Cache Slough"),
+                  data=gamarid_data,
                   family=hurdle_lognormal(),
                   warmup=1000,iter=3000,chains=3,cores=3,thin=10,
                   control=list(adapt_delta=0.99))
+
+loo(m_gamarid5,m_gamarid5.1,  m_gamarid6)
+
+#the one with season and the interaction term is best, but the interaction didn't add a lot. 
+
+
+#how much variability is there in your random effect?
+#if random effect
+
+r_draws <- m_gamarid5.1 %>%
+  spread_draws(r_Year[Year], sd_Year__Intercept) 
+r_draws2 <- m_gamarid5.1 %>%
+  spread_draws(r_Source[Source], sd_Source__Intercept) 
+
+ggplot(data=r_draws2,aes(x = r_Source, y = Source)) +
+  stat_halfeye(aes(group=Source))+
+  theme_bw()
+ggplot(data=r_draws,aes(x = r_Year, y = Year)) +
+  stat_halfeye(aes(group=Year))+
+  theme_bw()
+
+save(m_gamarid5,m_gamarid5.1,  m_gamarid6, file = "outputs/gamarid_brms.RData")
+
+#why is 2023 so different?
+
+######### corophiids ######################################
+
+
+corph_data <- Amphipoda%>%
+  filter(AmphGroup == "Corophiidae", SizeClass == "Macro") %>%
+  mutate(Month = month(Date),
+         Season = case_when(Month %in% c(3,4,5)~ "Spring",
+                            Month %in% c(6,7,8) ~ "Summer",
+                            Month %in% c(9,10,11) ~ "Fall",
+                            Month %in% c(12,1,2) ~ "Winter"),
+         Season = factor(Season, levels = c("Spring", "Summer", "Fall", "Winter")),
+         yr_mo=paste(Year,Month,sep="_"),
+         wetland_na_yr_mo=paste(Project_na,Year,Month,sep="_"),
+         wetland_yr_sea=paste(Project_na,Year,Season,sep="_"),
+         
+         Reagion_yr_sea=paste(Region,Year,Season,sep="_"),
+         wetland_yr=paste(Project_na,Year, sep="_"),
+         logCPUE = log(CPUE+1)) %>%
+  ungroup()
+
+
+
+m_corph5 <- brm(formula =  bf(CPUE ~ Type*Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=corph_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))
+#oh, way better 
+
+summary(m_corph5)
+plot(m_corph5)
+mcmc_plot(m_corph5)
+plot(conditional_effects(m_corph5),theme=theme_bw())
+pp_check(m_corph5, type = "loo_pit_overlay")
+# really need to figure out what this means. 
+
+m_corph5.1 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
+                                    (1|Source)+
+                                    (1|Year),
+                                  hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                    data=corph_data,
+                    family=hurdle_lognormal(),
+                    warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                    control=list(adapt_delta=0.99))
+#oh, way better 
+
+summary(m_corph5.1)
+plot(m_corph5.1)
+mcmc_plot(m_corph5.1)
+plot(conditional_effects(m_corph5.1),theme=theme_bw())
+pp_check(m_corph5.1, type = "loo_pit_overlay")
+# really need to figure out what this means. 
+
+
+
+
+
+
+m_corph6 <- brm(formula =  bf(CPUE ~ Type+Region + Season +
+                                  # Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=corph_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  control=list(adapt_delta=0.99))
+
+loo(m_corph5,m_corph5.1,  m_corph6)

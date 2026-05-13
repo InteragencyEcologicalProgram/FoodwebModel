@@ -215,9 +215,9 @@ m_gamarid4 <- brm(formula =  bf(CPUE ~ Type*Project_na +
                                   (1|Source)+
                                   (1|Year),
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
-                  data=gamarid_data,
+                  data=filter(gamarid_data, !Region %in% c( "Decker","Web Tract Berms")),
                   family=hurdle_lognormal(),
-                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
+                  warmup=1000,iter=5000,chains=3,cores=3,thin=10,
                   control=list(adapt_delta=0.99))
 warnings(m_gamarid4)
 

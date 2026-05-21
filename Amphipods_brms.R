@@ -7,6 +7,7 @@ library(brms)
 library(tidybayes)
 library(bayesplot)
 library(bayestestR)
+library(cmdstanr)
 library(ggeffects)
 
 ####functions####
@@ -109,8 +110,8 @@ m_gamarid2 <- brm(formula = logCPUE ~ Type +
                 (1|Year),
               data=filter(gamarid_data, Region ==  "Cache Slough"),
               family=gaussian(),
-              warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-              control=list(adapt_delta=0.99))
+              warmup=1000,iter=3000,chains=3,cores=14,thin=10,
+              control=list(adapt_delta=0.99), backend = "cmdstanr")
 
 
 #I got all these warnings with region in the model and all teh data. no warnings when just Cahce. 
@@ -302,7 +303,60 @@ ggplot(data=r_draws,aes(x = r_Year, y = Year)) +
   stat_halfeye(aes(group=Year))+
   theme_bw()
 
-save(m_gamarid5,m_gamarid5.1,  m_gamarid6, file = "outputs/gamarid_brms.RData")
+#now with habitat type
+gamarid_data = mutate(gamarid_data, Habitat = case_when(TowType %in% c("Oblique", "Surface", "Bottom", "NT", "Neuston") ~ "Open Water",
+                                                    TowType == "SAV" | (TowType == "SN" & str_detect(SampleID, "SAV")) ~ "SAV",
+                                                    TowType == "EAV" | (TowType == "SN" & str_detect(SampleID, "EAV")) ~ "EAV",
+                                                    TowType == "FAV" | (TowType == "SN" & str_detect(SampleID, "FAV")) ~ "FAV",
+                                                    TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic"))
+
+
+
+
+m_gamarid7 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
+                                  Habitat+
+                                  # Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=gamarid_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                  control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+
+m_gamarid8 <- brm(formula =  bf(CPUE ~ Type+Region + Season +
+                                  Habitat+
+                                  # Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=gamarid_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                  control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+m_gamarid9 <- brm(formula =  bf(CPUE ~ Type+Region + 
+                                  Habitat+
+                                  # Region + 
+                                  (1|Source)+
+                                  (1|Year),
+                                hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                  data=gamarid_data,
+                  family=hurdle_lognormal(),
+                  warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                  control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+loo(m_gamarid5,m_gamarid5.1,  m_gamarid6, m_gamarid7, m_gamarid8, m_gamarid9)
+#7 is the best!
+
+summary(m_gamarid7)
+plot(m_gamarid7)
+mcmc_plot(m_gamarid7)
+plot(conditional_effects(m_gamarid7),theme=theme_bw())
+pp_check(m_gamarid7, type = "loo_pit_overlay")
+save(m_gamarid5,m_gamarid5.1,  m_gamarid6, m_gamarid7, file = "outputs/gamarid_brms.RData")
 
 #why is 2023 so different?
 
@@ -334,8 +388,8 @@ m_corph5 <- brm(formula =  bf(CPUE ~ Type*Region +
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
                   data=corph_data,
                   family=hurdle_lognormal(),
-                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                  control=list(adapt_delta=0.99))
+                  warmup=1000,iter=3000,chains=3,,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
 #oh, way better 
 
 summary(m_corph5)
@@ -351,8 +405,8 @@ m_corph5.1 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
                                   hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
                     data=corph_data,
                     family=hurdle_lognormal(),
-                    warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                    control=list(adapt_delta=0.99))
+                    warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                    control=list(adapt_delta=0.99), backend = "cmdstanr")
 #oh, way better 
 
 summary(m_corph5.1)
@@ -374,7 +428,157 @@ m_corph6 <- brm(formula =  bf(CPUE ~ Type+Region + Season +
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
                   data=corph_data,
                   family=hurdle_lognormal(),
-                  warmup=1000,iter=3000,chains=3,cores=3,thin=10,
-                  control=list(adapt_delta=0.99))
+                  warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
 
 loo(m_corph5,m_corph5.1,  m_corph6)
+
+
+#what about habitat type? #########################################################
+
+unique(Amphipoda$TowType)
+names(Amphipoda)
+
+test = filter(Amphipoda, TowType == "SN")
+corph_data = mutate(corph_data, Habitat = case_when(TowType %in% c("Oblique", "Surface", "Bottom", "NT", "Neuston") ~ "Open Water",
+                                                    TowType == "SAV" | (TowType == "SN" & str_detect(SampleID, "SAV")) ~ "SAV",
+                                                    TowType == "EAV" | (TowType == "SN" & str_detect(SampleID, "EAV")) ~ "EAV",
+                                                    TowType == "FAV" | (TowType == "SN" & str_detect(SampleID, "FAV")) ~ "FAV",
+                                                    TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic"))
+
+#try all the data first, then limit to just spring, then try just sweep nets
+m_corph7 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
+                                Habitat+
+                                (1|Source)+
+                                (1|Year),
+                              hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                data=corph_data,
+                family=hurdle_lognormal(),
+                warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+summary(m_corph7)
+plot(m_corph7)
+mcmc_plot(m_corph7)
+plot(conditional_effects(m_corph7),theme=theme_bw())
+pp_check(m_corph7, type = "loo_pit_overlay")
+
+#THIS IS BEUATIFUL AND MAKES SENSE
+
+
+save(m_corph5, m_corph5.1, m_corph6, m_corph7, file = "outputs/corophiumods.RData")
+
+loo(m_corph5,m_corph5.1,  m_corph6, m_corph7)
+
+
+#how much does season really add?
+m_corph8 <- brm(formula =  bf(CPUE ~ Type*Region +
+                                Habitat+
+                                (1|Source)+
+                                (1|Year),
+                              hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                data=corph_data,
+                family=hurdle_lognormal(),
+                warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+loo(m_corph5,m_corph5.1,  m_corph6, m_corph7, m_corph8)
+#so, Season does help, bu tnot as much as habitat type.
+
+#what about Region?
+m_corph9 <- brm(formula =  bf(CPUE ~ Type*Habitat +
+                                Season+
+                                (1|Source)+
+                                (1|Year),
+                              hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                data=corph_data,
+                family=hurdle_lognormal(),
+                warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+loo(m_corph5,m_corph5.1,  m_corph6, m_corph7, m_corph9)
+
+#what about inside/outside?
+m_corph10 <- brm(formula =  bf(CPUE ~ Region*Habitat +
+                                Season+
+                                (1|Source)+
+                                (1|Year),
+                              hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                data=corph_data,
+                family=hurdle_lognormal(),
+                warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+#kitchen sink
+
+
+#what about inside/outside?
+m_corph11 <- brm(formula =  bf(CPUE ~ Region*Habitat + Type*Region +
+                                Season+
+                                (1|Source)+
+                                (1|Year),
+                              hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                data=corph_data,
+                family=hurdle_lognormal(),
+                warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+#Warning: 600 of 600 (100.0%) transitions hit the maximum treedepth limit of 10.#probably can't do both interactions
+
+#what about inside/outside?
+m_corph12 <- brm(formula =  bf(CPUE ~ Region*Habitat + Type+
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=corph_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+#Warning: 600 of 600 (100.0%) transitions hit the maximum treedepth limit of 10.
+
+#what's the matter?
+
+ggplot(corph_data, aes(x = Region, fill = Type)) + facet_wrap(~Habitat) + geom_bar()
+#don't have FAV in some regions/type combinations.
+m_corph12.1 <- brm(formula =  bf(CPUE ~ Region*Habitat + Type+
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=filter(corph_data, Habitat != "FAV"),
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+m_corph12.2 <- brm(formula =  bf(CPUE ~ Region+Habitat + Type+
+                                   Season+
+                                   (1|Source)+
+                                   (1|Year),
+                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                   data=corph_data,
+                   family=hurdle_lognormal(),
+                   warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                   control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+m_corph13 <- brm(formula =  bf(CPUE ~ Region+Habitat + 
+                                   Season+
+                                   (1|Source)+
+                                   (1|Year),
+                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                   data=corph_data,
+                   family=hurdle_lognormal(),
+                   warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                   control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+loo(m_corph6, m_corph7, m_corph9, m_corph10, m_corph12, m_corph12.2, m_corph13)
+#m_corph7 is best, Type*Region + Habitat + Season
+#expected log predictive density (ELPD) – this is an estimate of the predictive 
+#performance of the model on new data, and we can use it to compare models from 
+#different function families. With ELPD, larger values indicate better estimated 
+#predictive performance.
+
+# choose the model with the lowest complexity whose estimated predictive performance is within one standard error of the best performance
+
+summary(m_corph7)

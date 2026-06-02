@@ -34,6 +34,7 @@ Allbugs_Mar2026 = filter(Allbugs_Oct2025,  Source != "20mm")  %>%
 
 table(Allbugs_Mar2026$Source, Allbugs_Mar2026$Year)
 
+save(Allbugs_Mar2026, file = 'data/AllWetlandBugs_2010onwards.RData')
 #Bring in shapefile
 #top priority sites from Dan's analysis
 #Flyway Farms, Winter Island, LICB, Webb Tract, Tule Red, Ryer Island, LHT,

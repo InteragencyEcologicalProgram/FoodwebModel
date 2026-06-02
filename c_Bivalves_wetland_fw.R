@@ -321,4 +321,26 @@ lognormal_CPUE_Other <- fitdist(Other_logCPUE_pos$Other_CPUE, "lnorm")
 summary(lognormal_CPUE_Other)
 plot(lognormal_CPUE_Other)
 
+#some explortory plots
 
+ggplot(Bivalves, aes(x = Type, y = CPUE, fill = ClamGroup)) + geom_boxplot()+
+  facet_wrap(~Project_na)+ scale_y_log10()
+
+ggplot(Bivalves, aes(x = ClamGroup, y = CPUE, fill = Type)) + geom_boxplot()+
+  facet_wrap(~Project_na)+ scale_y_log10()
+
+#pull in data from further awa\\y\
+
+load('data/AllWetlandBugs_2010onwards.RData')
+
+clams = Allbugs_Mar2026 %>%
+  filter(TowType %in% c("PPG", "Ponar", "PVC"), Genus %in% c("Corbicula", "Potamocorbula"), !is.na(Latitude)) %>%
+  st_as_sf(coords= c("Longitude", "Latitude"), crs = 4326) %>%
+  st_transform(crs = st_crs(PrioritySites)) %>%
+  st_join(allsites) %>%
+  filter(is.na(Project_na)) %>%
+  filter(!SampleID %in% Bivalves$SampleID)
+
+#so these are all the sites outside of wetlands
+clams = mutate(clams, Year = year(Date), Month = month(Date))
+ggplot(clams, aes(x = as.factor(Year), y = CPUE, fill = Taxname)) + geom_boxplot()+ scale_y_log10()

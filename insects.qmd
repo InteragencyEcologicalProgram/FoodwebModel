@@ -1,0 +1,113 @@
+---
+title: "insects"
+author: "Pete Nelson"
+format: html
+editor: visual
+---
+
+# intro
+
+Explore Rosie's data to see what monitoring programs and sampling techniques seem adequate for studying the occurrence of insects. Then, to see how effectively these have been applied to the project areas that we're interested in. I'll start by loading some libraries and then looking at some of the data files that Rosie's provided (no
+
+```{r}
+#| label: data
+#| echo: false
+
+library(here)
+library(janitor)
+library(tidyverse)
+
+load(here("data/AllWetlandBugs.RData")) # AllBugs
+load(here("data/AllWetlandBugs_2010onwards.RData")) # Allbugs_Oct2025
+load(here("data/Bugs_allfilters.RData"))
+load(here("data/Insects.RData")))
+glimpse(AllBugs) # 427,198 x 38
+glimpse(Allbugs_Oct2025) # 2,266,598 x 40
+glimpse(Bugs_allfilters) # 874,790 x 47
+glimpse(Insects) # 7,601 x 27
+
+```
+
+I'm unfamiliar with all of the sites, most of the monitoring programs, and many of the sampling techniques (or at least what their codes refer to). The `Insects` data file is limited to chironomids and all other insects, so I'm going to poke around in `Bugs_allfilters` data (though it may well be that that's the best taxonomic resolution we can hope for). This may be the wrong place to start; if so, I'm hoping it'll be relatively easy to correct later.
+
+# data exploration
+
+I want to see how well different sampling programs ('Source') and sampling techniques ('TowType') work for insects.
+
+```{r}
+#| label: sampling-efficacy
+
+Bugs_allfilters %>%
+  filter(Class == "Insecta") %>%
+  group_by(Source, TowType, SampleID) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%   # one row per tow
+  group_by(Source, TowType) %>%
+  summarise(
+    n_samples      = n_distinct(SampleID),
+    n_zero_samples = sum(sample_CPUE == 0),         # tows that caught zero insects
+    prop_zero      = mean(sample_CPUE == 0),        # handy for the hurdle question
+    mean_CPUE      = mean(sample_CPUE),             # mean catch per tow, zeros included
+    total_CPUE     = sum(sample_CPUE),
+    .groups = "drop"
+  )
+
+```
+
+I'd say where `prop_zero` = 1, these aren't useful, but the next "worst" is `USGSbenthic` (`prop_zero` = 0.590) and that seems super good enough. However, we should probably see how well these sampling efforts have been applied to the areas of interest.
+
+```{r}
+#| label: sites
+#| echo: false
+
+load(here("data/PrioritySites.RData"))
+PrioritySites
+
+# these are, presumably, the data from the relevant sites
+df <- Bugs_allfilters %>% filter(Project_na %in% PrioritySites$Project_na)
+
+# turns out that Bugs_allfilters already includes only the priority sites
+
+```
+
+```{r}
+insect_summary <-
+  Bugs_allfilters %>%
+  filter(Class == "Insecta") %>%
+  group_by(Project_na, Source, TowType, SampleID) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%   # one row per tow
+  group_by(Project_na, Source, TowType) %>%
+  summarise(
+    n_samples      = n_distinct(SampleID),
+    n_zero_samples = sum(sample_CPUE == 0),         # tows that caught zero insects
+    prop_zero      = mean(sample_CPUE == 0),        # handy for the hurdle question
+    mean_CPUE      = mean(sample_CPUE),             # mean catch per tow, zeros included
+    total_CPUE     = sum(sample_CPUE),
+    .groups = "drop"
+  ) %>% 
+  filter(prop_zero < 0.75)
+
+insect_summary %>%
+  group_by(Source, TowType) %>%
+  summarise(
+    overall_mean_CPUE = mean(mean_CPUE),
+    median_mean_CPUE  = median(mean_CPUE),
+    mean_prop_zero    = mean(prop_zero),
+    n_sites           = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(overall_mean_CPUE))
+
+# All sites in the filtered dataset
+all_sites <- insect_summary %>%
+  distinct(Project_na)
+
+# Sites that were sampled with FRP + SAV
+frp_sav_sites <- insect_summary %>%
+  filter(Source == "FRP", TowType == "SAV") %>%
+  distinct(Project_na)
+
+# Sites that were NOT sampled with FRP + SAV
+all_sites %>%
+  anti_join(frp_sav_sites, by = "Project_na")
+
+```

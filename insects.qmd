@@ -184,7 +184,7 @@ Before committing to a hurdle lognormal, check (1) what fraction of samples are 
 
 # --- panel A: full distribution including zeros ---
 p_all <- ggplot(insect_df, aes(x = sample_CPUE)) +
-  geom_histogram(bins = 60, fill = "steelblue", colour = "white", linewidth = 0.2) +
+  geom_histogram(bins = 60, fill = "lightblue", colour = "white", linewidth = 0.2) +
   labs(title = "A: All CPUE (including zeros)",
        x = "CPUE (counts/volume)", y = "count") +
   theme_bw()
@@ -193,7 +193,7 @@ p_all <- ggplot(insect_df, aes(x = sample_CPUE)) +
 p_nonzero <- insect_df %>%
   filter(sample_CPUE > 0) %>%
   ggplot(aes(x = sample_CPUE)) +
-  geom_histogram(bins = 60, fill = "steelblue", colour = "white", linewidth = 0.2) +
+  geom_histogram(bins = 60, fill = "lightblue", colour = "white", linewidth = 0.2) +
   scale_x_log10() +
   labs(title = "B: Non-zero CPUE (log10 x-axis)",
        x = "CPUE (counts/volume)", y = "count") +
@@ -205,7 +205,7 @@ p_qq <- insect_df %>%
   filter(sample_CPUE > 0) %>%
   mutate(log_CPUE = log(sample_CPUE)) %>%
   ggplot(aes(sample = log_CPUE)) +
-  stat_qq(colour = "steelblue", alpha = 0.4) +
+  stat_qq(colour = "lightblue", alpha = 0.4) +
   stat_qq_line(colour = "firebrick") +
   labs(title = "C: QQ-plot of log(CPUE) vs normal",
        x = "theoretical quantiles", y = "sample quantiles") +
@@ -216,7 +216,7 @@ p_zeros <- insect_df %>%
   group_by(Project_na) %>%
   summarise(prop_zero = mean(sample_CPUE == 0), n = n(), .groups = "drop") %>%
   ggplot(aes(x = reorder(Project_na, prop_zero), y = prop_zero)) +
-  geom_col(fill = "steelblue") +
+  geom_col(fill = "lightblue") +
   geom_text(aes(label = n), hjust = -0.2, size = 3) +
   coord_flip() +
   labs(title = "D: Proportion zeros by site (n = samples)",
@@ -226,6 +226,16 @@ p_zeros <- insect_df %>%
 (p_all | p_nonzero) / (p_qq | p_zeros)
 
 ```
+
+Several useful things here.
+
+**Panel B and C together** are the most important. The non-zero CPUE on log scale (B) looks remarkably flat/uniform rather than bell-shaped — that's not what I'd expect from a lognormal and the QQ-plot (C) confirms this: the middle of the distribution tracks the line reasonably well, but both tails deviate. A true lognormal should curve upward in the upper tail, not spike like that. This suggests the lognormal assumption is passable but not great, and those high-value outliers are influential.
+
+**Panel D** is striking — Browns, Chipps, Winter, and Ryer all have 25–50% zero catches, while the bottom five sites (Web Tract Berms, LICB, Liberty, Flyway Farms, Decker) have essentially NO zeros. That's a strong site-level pattern in the *hurdle* component that my models aren't capturing because `hu ~ 1` pools everything. The top four sites are almost certainly our outside or less-vegetated sites — worth checking.
+
+**Panel A** just confirms the extreme right skew and those two outlier samples around 1250 and 2000 that are visible above the main mass.
+
+**What I'd do next:** First, ask the group: what's different about the groups in panel D, those with substantial frequencies of zero and those with none? Then, check whether the high-zero sites map onto a particular Type (inside/outside) or characteristic, and consider fitting a model with `hu ~ Project_na` or at minimum `hu ~ Type` to let zero probability vary. That panel D pattern looks like real signal that the current models are ignoring.
 
 ```{r}
 #| label: zeros-by-year-type
@@ -268,19 +278,20 @@ site_summary <- insect_df %>%
   )
 
 ggplot(site_summary,
-       aes(x = reorder(Project_na, mean_CPUE), y = mean_CPUE, fill = Type)) +
-  geom_col() +
+       aes(x = reorder(Project_na, mean_CPUE), y = mean_CPUE, 
+           fill = Type, group = Type)) +
+  geom_col(position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = mean_CPUE - se_CPUE,
                     ymax = mean_CPUE + se_CPUE),
-                width = 0.3) +
-  geom_text(aes(label = paste0("n=", n, "\n", round(prop_zero, 2), " zeros")),
-            hjust = -0.1, size = 2.8) +
+                width = 0.3,
+                position = position_dodge(width = 0.9)) +
   coord_flip() +
-  scale_fill_manual(values = c("Inside" = "steelblue", "Outside" = "coral")) +
+  scale_fill_manual(values = c("Inside" = "lightblue", "Outside" = "gray")) +
   labs(title = "Mean insect CPUE by site",
-       subtitle = "Error bars = ±1 SE; label shows n and proportion zeros",
+       subtitle = "Error bars = ±1 SE",
        x = NULL, y = "mean CPUE (counts/volume)", fill = "Type") +
   theme_bw()
+
 ```
 
 ```{r}
@@ -304,7 +315,7 @@ ggplot(type_year_summary,
   geom_errorbar(aes(ymin = mean_CPUE - se_CPUE,
                     ymax = mean_CPUE + se_CPUE),
                 width = 0.2) +
-  scale_colour_manual(values = c("Inside" = "steelblue", "Outside" = "coral")) +
+  scale_colour_manual(values = c("Inside" = "green", "Outside" = "blue")) +
   labs(title = "Mean insect CPUE by type and year",
        subtitle = "Point size = n samples; error bars = ±1 SE",
        y = "mean CPUE (counts/volume)", colour = "Type", size = "n") +
@@ -325,7 +336,7 @@ insect_df %>%
                aes(group = Project_na), linewidth = 0.6) +
   stat_summary(fun = mean, geom = "point", size = 2.5, shape = 18) +
   scale_y_log10(labels = scales::comma) +
-  scale_colour_manual(values = c("Inside" = "steelblue", "Outside" = "coral")) +
+  scale_colour_manual(values = c("Inside" = "green", "Outside" = "blue")) +
   facet_wrap(~ Project_na) +
   labs(title = "CPUE by site and year (log scale)",
        subtitle = "Points = individual tows; diamonds = site mean; lines connect means",
@@ -394,21 +405,21 @@ summary(m0)
 
 ```
 
-The model converged cleanly (all Rhat = 1.00, ESS well above 400 for all parameters). Here's what each piece tells you:
+The model converged cleanly (all Rhat = 1.00, ESS well above 400 for all parameters). Here's what each piece tells us:
 
 **Hurdle component (hu_Intercept = -1.73)**
 `plogis(-1.73) ≈ 0.15` — about 15% of FRP+SAV insect samples catch nothing. That's a moderate zero rate, consistent with a hurdle model being appropriate but not dominated by zeros.
 
 **Lognormal component (Intercept = 3.51)**
-The expected log-CPUE for a non-zero catch is 3.51, so the median CPUE on the raw scale is `exp(3.51) ≈ 33` insects/volume. The wide CI (2.44–4.69) reflects genuine year-to-year variability being absorbed by the random effect.
+The expected log-CPUE for a non-zero catch is 3.51, so the median CPUE on the raw scale is `exp(3.51) ≈ 33` insects/volume. The wide CI (2.44–4.69)...year-to-year variability absorbed by the random effect.
 
 **Year random effect (sd = 1.03)**
-This is large — on the log scale, a SD of 1 means years routinely differ by a factor of `exp(1) ≈ 2.7` in median CPUE. With only 4 levels the estimate is uncertain (0.35–2.41), but it's clearly non-trivial. This justifies keeping `(1 | Year)` in all subsequent models.
+This is large — on the log scale, a SD of 1 means years may differ by a factor of `exp(1) ≈ 2.7` in median CPUE. With only 4 levels the estimate is uncertain (0.35–2.41), but it's clearly non-trivial. This justifies keeping `(1 | Year)` in all subsequent models.
 
 **sigma = 1.66**
 Within-year, within-site residual variation on the log scale is also large. `exp(1.66) ≈ 5.3`, meaning even after accounting for year, individual tow catches vary by roughly 5-fold. Insects are patchy — that's expected.
 
-**Bottom line for m0:** \~15% zeros, median catch \~33/volume, but enormous variability both across years and within years. The year random effect is doing real work, and the wide sigma suggests site or type effects (m1–m4) might explain some of that residual spread. That's exactly what you'll find out from the comparisons.
+**Bottom line for m0:** \~15% zeros, median catch \~33/volume, but enormous variability both across years and within years. The year random effect is explaining a lot, and the wide sigma suggests site or type effects (m1–m4) might explain some of that residual spread.
 
 ```{r}
 #| label: m1-type
@@ -526,4 +537,4 @@ loo_compare(m0, m1, m2, m3, m4)
 
 **Neither inside/outside nor site identity is explaining much of the variance in insect CPUE**, at least not beyond what year already captures.
 
-The large sigma (1.66) and year SD (∼1.0) from m0 are still doing most of the work. With only 75 samples across 4 years, you may simply be underpowered to detect site or type effects even if they exist. We have 75 samples across 4 years and multiple sites, and the honest answer is: **the data don't show a clear signal for inside vs. outside, or for site differences, beyond what year-to-year variation already explains.**
+The large sigma (1.66) and year SD (∼1.0) from m0 are still doing most of the work. With only 75 samples across 4 years, we seem to be underpowered to detect site or type effects even if they exist: **the data don't show a clear signal for inside vs. outside, or for site differences, beyond what year-to-year variation already explains.**

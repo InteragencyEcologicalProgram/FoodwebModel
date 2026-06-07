@@ -407,17 +407,13 @@ summary(m0)
 
 The model converged cleanly (all Rhat = 1.00, ESS well above 400 for all parameters). Here's what each piece tells us:
 
-**Hurdle component (hu_Intercept = -1.73)**
-`plogis(-1.73) ≈ 0.15` — about 15% of FRP+SAV insect samples catch nothing. That's a moderate zero rate, consistent with a hurdle model being appropriate but not dominated by zeros.
+**Hurdle component (hu_Intercept = -1.73)** `plogis(-1.73) ≈ 0.15` — about 15% of FRP+SAV insect samples catch nothing. That's a moderate zero rate, consistent with a hurdle model being appropriate but not dominated by zeros.
 
-**Lognormal component (Intercept = 3.51)**
-The expected log-CPUE for a non-zero catch is 3.51, so the median CPUE on the raw scale is `exp(3.51) ≈ 33` insects/volume. The wide CI (2.44–4.69)...year-to-year variability absorbed by the random effect.
+**Lognormal component (Intercept = 3.51)** The expected log-CPUE for a non-zero catch is 3.51, so the median CPUE on the raw scale is `exp(3.51) ≈ 33` insects/volume. The wide CI (2.44–4.69)...year-to-year variability absorbed by the random effect.
 
-**Year random effect (sd = 1.03)**
-This is large — on the log scale, a SD of 1 means years may differ by a factor of `exp(1) ≈ 2.7` in median CPUE. With only 4 levels the estimate is uncertain (0.35–2.41), but it's clearly non-trivial. This justifies keeping `(1 | Year)` in all subsequent models.
+**Year random effect (sd = 1.03)** This is large — on the log scale, a SD of 1 means years may differ by a factor of `exp(1) ≈ 2.7` in median CPUE. With only 4 levels the estimate is uncertain (0.35–2.41), but it's clearly non-trivial. This justifies keeping `(1 | Year)` in all subsequent models.
 
-**sigma = 1.66**
-Within-year, within-site residual variation on the log scale is also large. `exp(1.66) ≈ 5.3`, meaning even after accounting for year, individual tow catches vary by roughly 5-fold. Insects are patchy — that's expected.
+**sigma = 1.66** Within-year, within-site residual variation on the log scale is also large. `exp(1.66) ≈ 5.3`, meaning even after accounting for year, individual tow catches vary by roughly 5-fold. Insects are patchy — that's expected.
 
 **Bottom line for m0:** \~15% zeros, median catch \~33/volume, but enormous variability both across years and within years. The year random effect is explaining a lot, and the wide sigma suggests site or type effects (m1–m4) might explain some of that residual spread.
 

@@ -86,6 +86,7 @@ names(Bugs_allfilters)
 # this is the data file I want to work with. I think.
 
 # prep & tidy insect data -----
+## sample meta -----
 # all insects data
 # zero-insect samples don't have insect rows; have to build these zeros explicitely
 sample_meta <- Bugs_allfilters %>%
@@ -110,6 +111,7 @@ taxonomy_lookup <- Bugs_allfilters %>%
   filter(Class == "Insecta") %>%
   distinct(Taxname, Order, Family, Genus, Species)
 
+## CPUE ----
 # sum CPUE across lifestages, complete the grid
 insect_cpue <- Bugs_allfilters %>%
   filter(Class == "Insecta") %>%
@@ -121,6 +123,7 @@ insect_cpue <- Bugs_allfilters %>%
     fill = list(CPUE = 0)
   )
 
+## pivot wide -----
 # pivot wide, then join sample metadata and taxonomy
 insect_wide <- insect_cpue %>%
   pivot_wider(names_from = Taxname, values_from = CPUE, values_fill = 0) %>%
@@ -204,11 +207,168 @@ ggplot(diversity_long, aes(x = Source, y = value)) +
   theme_bw() +
   labs(x = NULL, y = NULL, title = "Insect diversity by sampling method")
 
-# conclusion ----
+# re-group ----
+## sample methods -----
+# consider which sampling methods are best suited for insects (kind of impossible)
+# going to look for methods (Source x TowType) that yield the lowest proportion of zeros
+method_summary <- Bugs_allfilters %>%
+  filter(Class == "Insecta") %>%
+  group_by(Source, TowType, SampleID, Project_na) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  group_by(Source, TowType) %>%
+  summarise(
+    n_samples = n(),
+    n_sites   = n_distinct(Project_na),
+    prop_zero = mean(sample_CPUE == 0),
+    mean_CPUE = mean(sample_CPUE),
+    .groups   = "drop"
+  ) %>%
+  arrange(prop_zero)
 
-# clearly, the Allbugs_Mar2026 data are far more complete! but only if you want to focus exclusively on chironomids
+method_summary
 
+ggplot(method_summary, aes(x = reorder(paste(Source, TowType, sep = " / "), prop_zero),
+                           y = prop_zero)) +
+  geom_col(fill = "steelblue") +
+  geom_hline(yintercept = 0.75, linetype = "dashed", color = "red") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = NULL, y = "Proportion zero-catch samples",
+       title = "Sampling method effectiveness: Insects")
 
+ggsave(here("outputs/insect_sampling_tools.png"))
+# exclude types w prop_zero > 0.75
+
+method_summary %>% 
+  # filter(prop_zero < 0.75, n_samples < 500) %>% 
+  ggplot(aes(n_samples, prop_zero, 
+             # paste() inside aes() creates the combo wo add'l column
+             color = paste(Source, TowType, sep = " / "))) +
+  geom_point(size = 3) +
+  labs(title = "Are number of samples & proportion of 0 catches correlated?",
+       x = "number of samples",
+       y = "proportion of zero catches") +
+  theme_bw() +
+  labs(color = "Source / TowType")
+
+good_methods <- method_summary %>%
+  filter(prop_zero < 0.75) %>%    
+  select(Source, TowType)
+
+Bugs_filtered <- Bugs_allfilters %>%
+  semi_join(good_methods, by = c("Source", "TowType"))
+
+## Update sample_meta ------ 
+# filtered methods only
+sample_meta_filtered <- Bugs_filtered %>%
+  distinct(SampleID, .keep_all = TRUE) %>%
+  select(SampleID, Project_na, Type, Region, Source, Date,
+         Station, TowType, Longitude, Latitude)
+
+## alt taxonomic level ----- 
+# add Family_clean to Bugs_filtered
+Bugs_filtered <- Bugs_filtered %>%
+  mutate(Family_clean = case_when(
+    !is.na(Family) ~ Family,
+    !is.na(Order) ~ paste0(Order, "_UnID"),
+    TRUE ~ "Insecta_UnID"
+  )) 
+
+## re-calc cpue ----
+# family-level CPUE per sample
+family_cpue_filtered <- Bugs_filtered %>%
+  filter(Class == "Insecta") %>%
+  group_by(SampleID, Family_clean) %>%
+  summarise(CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  complete(
+    SampleID = sample_meta_filtered$SampleID,
+    Family_clean,
+    fill = list(CPUE = 0)
+  )
+
+## new tax lookup ----- 
+
+family_taxonomy <- Bugs_filtered %>%
+  filter(Class == "Insecta") %>%
+  distinct(Family_clean, Order, Family)
+
+## re-calc diversity metrics -----
+family_diversity_filtered <- family_cpue_filtered %>%
+  group_by(SampleID) %>%
+  summarise(
+    total_CPUE = sum(CPUE),
+    richness   = sum(CPUE > 0),
+    shannon    = {p <- CPUE[CPUE > 0] / sum(CPUE[CPUE > 0]); -sum(p * log(p))},
+    simpson    = {p <- CPUE[CPUE > 0] / sum(CPUE[CPUE > 0]); 1 - sum(p^2)},
+    .groups    = "drop"
+  ) %>%
+  mutate(across(c(shannon, simpson), ~ if_else(total_CPUE == 0, NA_real_, .)))
+
+## pivot wide ------
+# wide format with metadata, diversity, and season
+family_wide_filtered <- family_cpue_filtered %>%
+  pivot_wider(names_from = Family_clean, values_from = CPUE, values_fill = 0) %>%
+  left_join(sample_meta_filtered, by = "SampleID") %>%
+  left_join(family_diversity_filtered, by = "SampleID") %>%
+  mutate(
+    Month  = month(Date),
+    Season = case_when(
+      Month %in% c(12, 1, 2) ~ "Winter",
+      Month %in% c(3, 4, 5) ~ "Spring",
+      Month %in% c(6, 7, 8) ~ "Summer",
+      Month %in% c(9, 10, 11) ~ "Fall"
+    ),
+    Season = factor(Season, levels = c("Winter", "Spring", "Summer", "Fall"))
+  ) %>%
+  relocate(names(sample_meta_filtered), total_CPUE, richness, shannon, simpson, Month, Season,
+           .before = everything())
+
+## pivot long -----
+diversity_long_filtered <- family_wide_filtered %>%
+  pivot_longer(cols = c(richness, shannon, simpson),
+               names_to = "metric", values_to = "value") %>%
+  filter(!is.na(value))
+
+### by site -----
+ggplot(diversity_long_filtered, 
+       aes(x = reorder(Project_na, value, median), y = value)) +
+  geom_boxplot(fill = "steelblue", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity by site")
+
+### by region -----
+ggplot(diversity_long_filtered, 
+       aes(x = reorder(Region, value, median), y = value)) +
+  geom_boxplot(fill = "steelblue", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity by region")
+
+### by season -----
+diversity_long_filtered %>%
+  filter(!is.na(Season)) %>%
+  ggplot(aes(x = Season, y = value)) +
+  geom_boxplot(fill = "steelblue", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity by season")
+
+### inside v outside diversity -----
+ggplot(diversity_long_filtered, aes(x = Type, y = value)) +
+  geom_boxplot(fill = "steelblue", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity Inside vs Outside")
+
+### methods diversity -----
+ggplot(diversity_long_filtered, aes(x = Source, y = value)) +
+  geom_boxplot(fill = "steelblue", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity by sampling method")
 
 # SCRATCH #################
 

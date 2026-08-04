@@ -40,14 +40,14 @@ Bugs_allfilters %>%
   # Source=monitoring program (eg 20mm, YBFMP)
   # TowType=sampling style (eg oblique tow, sweep of SAV, neuston)
   summarise(
-    n_samples      = n_distinct(SampleID),
-    n_zero_samples = sum(sample_CPUE == 0),         # tows that caught zero insects
-    prop_zero      = mean(sample_CPUE == 0),        # handy for the hurdle question
-    mean_CPUE      = mean(sample_CPUE),             # mean catch per tow, zeros included
-    total_CPUE     = sum(sample_CPUE),
+    n_samples = n_distinct(SampleID),
+    n_zero_samples = sum(sample_CPUE == 0), # tows that caught zero insects
+    prop_zero = mean(sample_CPUE == 0), # handy for the hurdle question
+    mean_CPUE = mean(sample_CPUE), # mean catch per tow, zeros included
+    total_CPUE = sum(sample_CPUE),
     .groups = "drop"
   )
-# Source*TowType where prop_zero=1 are NOT useful for looking at insects!
+# Source*TowType where prop_zero=1 NOT useful for looking at insects!
 
 levels(as.factor(Insects$Source))
 levels(as.factor(Insects$TowType)) # oof!
@@ -77,7 +77,7 @@ Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
            TurbidityFNU, SizeClass, InsectGroup,Volume) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
-#############
+## EMP surveys ----
 # want to know if there are any insects in the EMP surveys
 chir_by_source <- 
   Bugs_allfilters %>% 
@@ -106,8 +106,6 @@ insects_by_source <-
   print(n = 60)
 # dipterids (prob mostly chironomids) are the best represented insects but other groups may be worth looking at too
 write_csv(insects_by_source, "~/Library/CloudStorage/OneDrive-CaliforniaDepartmentofWaterResources/3-Projects/11-Foodweb Synthesis/insects_by_source.csv")
-
-#################
 
 ## sites & effort ------
 # set up for plotting sample locations [from Rosie's code]

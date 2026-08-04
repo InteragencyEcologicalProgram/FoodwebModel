@@ -16,13 +16,15 @@ Explore Rosie's data to see what monitoring programs and sampling techniques see
 library(here)
 library(janitor)
 library(tidyverse)
+library(brms)
+library(patchwork)
 
 load(here("data/AllWetlandBugs.RData")) # AllBugs
 load(here("data/AllWetlandBugs_2010onwards.RData")) # Allbugs_Oct2025
 load(here("data/Bugs_allfilters.RData"))
-load(here("data/Insects.RData")))
+load(here("data/Insects.RData"))
 glimpse(AllBugs) # 427,198 x 38
-glimpse(Allbugs_Oct2025) # 2,266,598 x 40
+glimpse(Allbugs_Mar2026) # 2,266,598 x 40
 glimpse(Bugs_allfilters) # 874,790 x 47
 glimpse(Insects) # 7,601 x 27
 
@@ -32,6 +34,8 @@ I'm unfamiliar with all of the sites, most of the monitoring programs, and many 
 
 # data exploration
 
+Add `brms` and `patchwork` to the library block if not already loaded.
+
 I want to see how well different sampling programs ('Source') and sampling techniques ('TowType') work for insects.
 
 ```{r}
@@ -40,14 +44,17 @@ I want to see how well different sampling programs ('Source') and sampling techn
 Bugs_allfilters %>%
   filter(Class == "Insecta") %>%
   group_by(Source, TowType, SampleID) %>%
-  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%   # one row per tow
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>% # one row per tow (sample unit)
   group_by(Source, TowType) %>%
   summarise(
-    n_samples      = n_distinct(SampleID),
-    n_zero_samples = sum(sample_CPUE == 0),         # tows that caught zero insects
-    prop_zero      = mean(sample_CPUE == 0),        # handy for the hurdle question
-    mean_CPUE      = mean(sample_CPUE),             # mean catch per tow, zeros included
-    total_CPUE     = sum(sample_CPUE),
+    n_samples = n_distinct(SampleID),
+    # tows that caught zero insects
+    n_zero_samples = sum(sample_CPUE == 0), 
+    # handy for the expected hurdle question
+    prop_zero = mean(sample_CPUE == 0), 
+    # mean catch per tow, zeros included
+    mean_CPUE = mean(sample_CPUE), 
+    total_CPUE = sum(sample_CPUE),
     .groups = "drop"
   )
 
@@ -70,18 +77,22 @@ df <- Bugs_allfilters %>% filter(Project_na %in% PrioritySites$Project_na)
 ```
 
 ```{r}
+#| label: data-selection
+
+
+# remove those projects w a higher proportion (>=0.75) of 0 insect catches
 insect_summary <-
   Bugs_allfilters %>%
   filter(Class == "Insecta") %>%
   group_by(Project_na, Source, TowType, SampleID) %>%
-  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%   # one row per tow
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>% # one row per tow (sample unit)
   group_by(Project_na, Source, TowType) %>%
   summarise(
-    n_samples      = n_distinct(SampleID),
-    n_zero_samples = sum(sample_CPUE == 0),         # tows that caught zero insects
-    prop_zero      = mean(sample_CPUE == 0),        # handy for the hurdle question
-    mean_CPUE      = mean(sample_CPUE),             # mean catch per tow, zeros included
-    total_CPUE     = sum(sample_CPUE),
+    n_samples = n_distinct(SampleID),
+    n_zero_samples = sum(sample_CPUE == 0), # tows that caught zero insects
+    prop_zero = mean(sample_CPUE == 0), # handy for the hurdle question
+    mean_CPUE = mean(sample_CPUE), # mean catch per tow, zeros included
+    total_CPUE = sum(sample_CPUE),
     .groups = "drop"
   ) %>% 
   filter(prop_zero < 0.75)
@@ -90,24 +101,436 @@ insect_summary %>%
   group_by(Source, TowType) %>%
   summarise(
     overall_mean_CPUE = mean(mean_CPUE),
-    median_mean_CPUE  = median(mean_CPUE),
-    mean_prop_zero    = mean(prop_zero),
-    n_sites           = n(),
+    median_mean_CPUE = median(mean_CPUE),
+    mean_prop_zero = mean(prop_zero),
+    n_sites = n(),
     .groups = "drop"
   ) %>%
   arrange(desc(overall_mean_CPUE))
 
-# All sites in the filtered dataset
+# all sites in the filtered dataset
 all_sites <- insect_summary %>%
-  distinct(Project_na)
+  distinct(Project_na) %>% 
+  print()
 
-# Sites that were sampled with FRP + SAV
+# sites that were sampled with FRP + SAV
 frp_sav_sites <- insect_summary %>%
   filter(Source == "FRP", TowType == "SAV") %>%
-  distinct(Project_na)
+  distinct(Project_na) %>% 
+  print()
 
-# Sites that were NOT sampled with FRP + SAV
+# sites that were NOT sampled with FRP + SAV
 all_sites %>%
   anti_join(frp_sav_sites, by = "Project_na")
 
 ```
+
+# FRP + SAV dataset
+
+Build the modelling dataset: FRP + SAV tows only, insect CPUE (counts/volume) aggregated to the sample level, retaining covariates for site, inside/outside, and year.
+
+```{r}
+#| label: frp-sav-data
+
+# run this first to see all column names and adjust below if needed
+# names(Bugs_allfilters)
+
+insect_df <-
+  Bugs_allfilters %>%
+  filter(
+    Source == "FRP",
+    TowType == "SAV",
+    Class == "Insecta"
+  ) %>%
+  group_by(
+    SampleID,
+    Project_na,
+    Year,
+    Type
+  ) %>%
+  summarise(
+    sample_CPUE = sum(CPUE, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Year = factor(Year),
+    Type = factor(Type),
+    Project_na = factor(Project_na)
+  )
+
+glimpse(insect_df)
+
+# quick check
+insect_df %>%
+  summarise(
+    n_samples = n(),
+    n_sites = n_distinct(Project_na),
+    n_years = n_distinct(Year),
+    prop_zero = mean(sample_CPUE == 0),
+    mean_CPUE = mean(sample_CPUE),
+    median_CPUE = median(sample_CPUE[sample_CPUE > 0])  # median of non-zeros
+  )
+
+```
+
+# distribution of CPUE
+
+Before committing to a hurdle lognormal, check (1) what fraction of samples are zero, (2) whether the non-zero CPUE values are approximately lognormal, and (3) whether zeros or the shape of non-zeros vary meaningfully across sites/years.
+
+```{r}
+#| label: cpue-distribution
+#| fig-width: 10
+#| fig-height: 8
+
+# --- panel A: full distribution including zeros ---
+p_all <- ggplot(insect_df, aes(x = sample_CPUE)) +
+  geom_histogram(bins = 60, fill = "lightblue", colour = "white", linewidth = 0.2) +
+  labs(title = "A: All CPUE (including zeros)",
+       x = "CPUE (counts/volume)", y = "count") +
+  theme_bw()
+
+# --- panel B: non-zero CPUE on log scale ---
+p_nonzero <- insect_df %>%
+  filter(sample_CPUE > 0) %>%
+  ggplot(aes(x = sample_CPUE)) +
+  geom_histogram(bins = 60, fill = "lightblue", colour = "white", linewidth = 0.2) +
+  scale_x_log10() +
+  labs(title = "B: Non-zero CPUE (log10 x-axis)",
+       x = "CPUE (counts/volume)", y = "count") +
+  theme_bw()
+
+# --- panel C: QQ-plot against lognormal ---
+# points should fall close to the line if lognormal is appropriate
+p_qq <- insect_df %>%
+  filter(sample_CPUE > 0) %>%
+  mutate(log_CPUE = log(sample_CPUE)) %>%
+  ggplot(aes(sample = log_CPUE)) +
+  stat_qq(colour = "lightblue", alpha = 0.4) +
+  stat_qq_line(colour = "firebrick") +
+  labs(title = "C: QQ-plot of log(CPUE) vs normal",
+       x = "theoretical quantiles", y = "sample quantiles") +
+  theme_bw()
+
+# --- panel D: proportion zeros by site ---
+p_zeros <- insect_df %>%
+  group_by(Project_na) %>%
+  summarise(prop_zero = mean(sample_CPUE == 0), n = n(), .groups = "drop") %>%
+  ggplot(aes(x = reorder(Project_na, prop_zero), y = prop_zero)) +
+  geom_col(fill = "lightblue") +
+  geom_text(aes(label = n), hjust = -0.2, size = 3) +
+  coord_flip() +
+  labs(title = "D: Proportion zeros by site (n = samples)",
+       x = NULL, y = "prop. zero") +
+  theme_bw()
+
+(p_all | p_nonzero) / (p_qq | p_zeros)
+
+```
+
+Several useful things here.
+
+**Panel B and C together** are the most important. The non-zero CPUE on log scale (B) looks remarkably flat/uniform rather than bell-shaped — that's not what I'd expect from a lognormal and the QQ-plot (C) confirms this: the middle of the distribution tracks the line reasonably well, but both tails deviate. A true lognormal should curve upward in the upper tail, not spike like that. This suggests the lognormal assumption is passable but not great, and those high-value outliers are influential.
+
+**Panel D** is striking — Browns, Chipps, Winter, and Ryer all have 25–50% zero catches, while the bottom five sites (Web Tract Berms, LICB, Liberty, Flyway Farms, Decker) have essentially NO zeros. That's a strong site-level pattern in the *hurdle* component that my models aren't capturing because `hu ~ 1` pools everything. The top four sites are almost certainly our outside or less-vegetated sites — worth checking.
+
+**Panel A** just confirms the extreme right skew and those two outlier samples around 1250 and 2000 that are visible above the main mass.
+
+**What I'd do next:** First, ask the group: what's different about the groups in panel D, those with substantial frequencies of zero and those with none? Then, check whether the high-zero sites map onto a particular Type (inside/outside) or characteristic, and consider fitting a model with `hu ~ Project_na` or at minimum `hu ~ Type` to let zero probability vary. That panel D pattern looks like real signal that the current models are ignoring.
+
+```{r}
+#| label: zeros-by-year-type
+
+# proportion zeros broken down by year and inside/outside
+insect_df %>%
+  group_by(Year, Type) %>%
+  summarise(
+    n = n(),
+    prop_zero = mean(sample_CPUE == 0),
+    mean_CPUE = mean(sample_CPUE),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = Year, y = prop_zero, colour = Type, group = Type)) +
+  geom_line() +
+  geom_point(aes(size = n)) +
+  labs(title = "Proportion zero catches by year and type",
+       y = "prop. zero", colour = "Type", size = "n samples") +
+  theme_bw()
+
+```
+
+# exploratory plots
+
+Before modelling, visualise mean CPUE (all samples, zeros included) by site and by inside/outside type, broken down by year to show temporal context.
+
+```{r}
+#| label: cpue-by-site
+#| fig-width: 9
+#| fig-height: 5
+
+site_summary <- insect_df %>%
+  group_by(Project_na, Type) %>%
+  summarise(
+    n = n(),
+    mean_CPUE  = mean(sample_CPUE),
+    se_CPUE = sd(sample_CPUE) / sqrt(n),
+    prop_zero = mean(sample_CPUE == 0),
+    .groups = "drop"
+  )
+
+ggplot(site_summary,
+       aes(x = reorder(Project_na, mean_CPUE), y = mean_CPUE, 
+           fill = Type, group = Type)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = mean_CPUE - se_CPUE,
+                    ymax = mean_CPUE + se_CPUE),
+                width = 0.3,
+                position = position_dodge(width = 0.9)) +
+  coord_flip() +
+  scale_fill_manual(values = c("Inside" = "lightblue", "Outside" = "gray")) +
+  labs(title = "Mean insect CPUE by site",
+       subtitle = "Error bars = ±1 SE",
+       x = NULL, y = "mean CPUE (counts/volume)", fill = "Type") +
+  theme_bw()
+
+```
+
+```{r}
+#| label: cpue-by-type-year
+#| fig-width: 8
+#| fig-height: 5
+
+type_year_summary <- insect_df %>%
+  group_by(Type, Year) %>%
+  summarise(
+    n = n(),
+    mean_CPUE = mean(sample_CPUE),
+    se_CPUE = sd(sample_CPUE) / sqrt(n),
+    .groups = "drop"
+  )
+
+ggplot(type_year_summary,
+       aes(x = Year, y = mean_CPUE, colour = Type, group = Type)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(aes(size = n)) +
+  geom_errorbar(aes(ymin = mean_CPUE - se_CPUE,
+                    ymax = mean_CPUE + se_CPUE),
+                width = 0.2) +
+  scale_colour_manual(values = c("Inside" = "green", "Outside" = "blue")) +
+  labs(title = "Mean insect CPUE by type and year",
+       subtitle = "Point size = n samples; error bars = ±1 SE",
+       y = "mean CPUE (counts/volume)", colour = "Type", size = "n") +
+  theme_bw()
+
+```
+
+```{r}
+#| label: cpue-by-site-year
+#| fig-width: 10
+#| fig-height: 6
+
+# jittered raw points + site mean per year — shows where the data are sparse
+insect_df %>%
+  ggplot(aes(x = Year, y = sample_CPUE, colour = Type)) +
+  geom_jitter(width = 0.15, alpha = 0.5, size = 1.5) +
+  stat_summary(fun = mean, geom = "line",
+               aes(group = Project_na), linewidth = 0.6) +
+  stat_summary(fun = mean, geom = "point", size = 2.5, shape = 18) +
+  scale_y_log10(labels = scales::comma) +
+  scale_colour_manual(values = c("Inside" = "green", "Outside" = "blue")) +
+  facet_wrap(~ Project_na) +
+  labs(title = "CPUE by site and year (log scale)",
+       subtitle = "Points = individual tows; diamonds = site mean; lines connect means",
+       y = "CPUE (log scale)", colour = "Type") +
+  theme_bw(base_size = 11)
+
+```
+
+# hurdle models
+
+We fit a series of hurdle lognormal models of increasing complexity. All models include a random intercept for `Year` to account for inter-annual variation (as in the bivalve analysis). The hurdle component (probability of zero catch) is modelled separately; we start with a fixed hurdle intercept and can relax that later.
+
+Models fitted:
+
+| model | fixed effects (mu)     | fixed effects (hu) |
+|-------|------------------------|--------------------|
+| `m0`  | intercept only         | intercept only     |
+| `m1`  | Type (in/out)          | intercept only     |
+| `m2`  | Project_na             | intercept only     |
+| `m3`  | Type + (1\|Project_na) | intercept only     |
+| `m4`  | Type + (1\|Project_na) | Type               |
+
+Model `m4` is the most flexible baseline: it includes a site-level random intercept, allows the non-zero mean to vary by inside/outside, and lets the hurdle probability differ by type.
+
+```{r}
+#| label: hurdle-priors
+
+# brms treats the intercept as class = Intercept (separate from class = b),
+# so we split priors into a base set valid for all models and additive sets
+# for models with fixed effects or a modelled hu component.
+
+# valid for every model
+priors_base <- c(
+  prior(normal(5, 3), class = Intercept), # mu intercept (log scale)
+  prior(normal(0, 1), class = Intercept, dpar = hu), # hu intercept (logit scale)
+  prior(exponential(1), class = sd), # random effect SDs
+  prior(exponential(1), class = sigma) # lognormal residual SD
+)
+
+# add to models that have mu fixed effects (m1–m4)
+prior_b <- prior(normal(0, 1), class = b)
+
+# add to models that have hu fixed effects (m4 only)
+prior_b_hu <- prior(normal(0, 1), class = b, dpar = hu)
+
+```
+
+```{r}
+#| label: m0-intercept-only
+#| cache: true
+
+m0 <- brm(
+  bf(sample_CPUE ~ 1 + (1 | Year),
+     hu ~ 1),
+  family  = hurdle_lognormal(),
+  prior = priors_base,
+  data = insect_df,
+  chains = 4, iter = 3000, warmup = 1000, thin = 10,
+  cores = 4,
+  seed = 42,
+  file = here("outputs/m0_insects") 
+)
+pp_check(m0)
+plot(m0) # values extend WAAAY out there; model thinks extreme catches plausible?
+summary(m0)
+
+```
+
+The model converged cleanly (all Rhat = 1.00, ESS well above 400 for all parameters). Here's what each piece tells us:
+
+**Hurdle component (hu_Intercept = -1.73)** `plogis(-1.73) ≈ 0.15` — about 15% of FRP+SAV insect samples catch nothing. That's a moderate zero rate, consistent with a hurdle model being appropriate but not dominated by zeros.
+
+**Lognormal component (Intercept = 3.51)** The expected log-CPUE for a non-zero catch is 3.51, so the median CPUE on the raw scale is `exp(3.51) ≈ 33` insects/volume. The wide CI (2.44–4.69)...year-to-year variability absorbed by the random effect.
+
+**Year random effect (sd = 1.03)** This is large — on the log scale, a SD of 1 means years may differ by a factor of `exp(1) ≈ 2.7` in median CPUE. With only 4 levels the estimate is uncertain (0.35–2.41), but it's clearly non-trivial. This justifies keeping `(1 | Year)` in all subsequent models.
+
+**sigma = 1.66** Within-year, within-site residual variation on the log scale is also large. `exp(1.66) ≈ 5.3`, meaning even after accounting for year, individual tow catches vary by roughly 5-fold. Insects are patchy — that's expected.
+
+**Bottom line for m0:** \~15% zeros, median catch \~33/volume, but enormous variability both across years and within years. The year random effect is explaining a lot, and the wide sigma suggests site or type effects (m1–m4) might explain some of that residual spread.
+
+```{r}
+#| label: m1-type
+#| cache: true
+
+m1 <- brm(
+  bf(sample_CPUE ~ Type + (1 | Year),
+     hu ~ 1),
+  family  = hurdle_lognormal(),
+  prior = c(priors_base, prior_b),
+  data = insect_df,
+  chains = 4, iter = 3000, warmup = 1000, thin = 10,
+  cores = 4,
+  seed = 42,
+  file = here("outputs/m1_insects")
+)
+pp_check(m1) # ok but again expecting lrg numbers we didn't see
+plot(m1) # the interesting (in v out) not so interesting
+summary(m1)
+
+```
+
+Again, zeros are rare.
+
+```{r}
+#| label: m2-site
+#| cache: true
+
+# Project_na as fixed effect — works if samples-per-site are adequate;
+# if many sites with few samples each, consider (1 | Project_na) instead
+m2 <- brm(
+  bf(sample_CPUE ~ Project_na + (1 | Year),
+     hu ~ 1),
+  family = hurdle_lognormal(),
+  prior = c(priors_base, prior_b),
+  data = insect_df,
+  control = list(adapt_delta = 0.95),
+  # had 3 diverg transitions, 
+  # so increased adapt_delta, iter and warmup and re-ran
+  chains  = 4, iter = 4000, warmup = 1500, thin = 10,
+  cores = 4,
+  seed = 42,
+  file_refit = "on_change", # "always" or "on_change"
+  file    = here("outputs/m2_insects")
+)
+pp_check(m2)
+plot(m2)
+summary(m2)
+
+```
+
+```{r}
+#| label: m3-type-site-re
+#| cache: true
+
+m3 <- brm(
+  bf(sample_CPUE ~ Type + (1 | Year) + (1 | Project_na),
+     hu ~ 1),
+  family  = hurdle_lognormal(),
+  prior = c(priors_base, prior_b),
+  data = insect_df,
+  chains  = 4, iter = 3000, warmup = 1000, thin = 10,
+  cores = 4,
+  seed = 42,
+  file = here("outputs/m3_insects")
+)
+pp_check(m3)
+plot(m3)
+summary(m3)
+
+```
+
+```{r}
+#| label: m4-full-baseline
+#| cache: true
+
+# most flexible baseline: Type in both components, site random intercept
+m4 <- brm(
+  bf(sample_CPUE ~ Type + (1 | Year) + (1 | Project_na),
+     hu ~ Type),
+  family  = hurdle_lognormal(),
+  prior = c(priors_base, prior_b, prior_b_hu),
+  data = insect_df,
+  control = list(adapt_delta = 0.95),
+  # had 3 diverg transitions, 
+  # so increased adapt_delta, iter and warmup and re-ran
+  chains  = 4, iter = 4000, warmup = 1500, thin = 10,
+  cores = 4,
+  seed = 42,
+  file_refit = "on_change", # "always" or "on_change"
+  file = here("outputs/m4_insects")
+)
+pp_check(m4)
+plot(m4)
+summary(m4)
+
+```
+
+```{r}
+#| label: model-comparison
+
+# LOO-CV comparison across all models
+m0 <- add_criterion(m0, "loo")
+m1 <- add_criterion(m1, "loo")
+# observations w pareto_k > 0.7...
+m2 <- add_criterion(m2, "loo", moment_match = TRUE)
+m3 <- add_criterion(m3, "loo", moment_match = TRUE)
+m4 <- add_criterion(m4, "loo", moment_match = TRUE)
+
+loo_compare(m0, m1, m2, m3, m4)
+
+```
+
+# status
+
+**Neither inside/outside nor site identity is explaining much of the variance in insect CPUE**, at least not beyond what year already captures.
+
+The large sigma (1.66) and year SD (∼1.0) from m0 are still doing most of the work. With only 75 samples across 4 years, we seem to be underpowered to detect site or type effects even if they exist: **the data don't show a clear signal for inside vs. outside, or for site differences, beyond what year-to-year variation already explains.**

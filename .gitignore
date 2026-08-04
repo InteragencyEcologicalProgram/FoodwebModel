@@ -11,3 +11,6 @@ data/RushRanchMetadata/
 data/AllWetlandBugs.csv
 *.tfw
 .positai
+insects_cache
+insects_files
+.DS_Store

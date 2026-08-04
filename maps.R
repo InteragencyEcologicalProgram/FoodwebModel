@@ -51,7 +51,7 @@ ggplot()+
   geom_sf(data = WW_Delta)+
   geom_sf(data = buff_2k1, aes(fill = Region))+
 #  geom_sf(data = PrioritySites)+
-  coord_sf(xlim = c(-122.1, -121.6), ylim = c(38.0, 38.4))
+  coord_sf(xlim = c(-122.88, -121.82), ylim = c(38.02, 38.4))
 
 
 ggplot()+
@@ -60,7 +60,7 @@ ggplot()+
   geom_sf(data = PrioritySites, aes(fill = Region))+
   coord_sf(xlim = c(-122.1, -121.6), ylim = c(38.0, 38.4))
 
-#I think i need a lHT that isn't just the water. Also veteteated plain
+#I think i need a lHT that isn't just the water. Also veteteated plain###############
 
 library(leaflet)
 
@@ -86,7 +86,7 @@ st_write(PrioritySites, "GIS dta/PrioritySites.shp")
 st_write(buff_2k1, "GIS dta/Exteriors.shp")
 
 
-#figure out where EMP samples are going
+#figure out where EMP samples are going ############################
 load('data/AllWetlandBugs_2010onwards.RData')
 load("data/Insects.RData")
 load("data/Bivalves.RData")
@@ -98,3 +98,70 @@ EMPben = filter(Allbugs_Mar2026, Source == "EMP_benthic")
 EMPben_sites = select(EMPben, Station, Latitude, Longitude) %>%
   distinct() %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove =F)
+
+#breach locations ###############################
+
+breaches = st_read("GIS dta/breaches/Breach_Midpoints.shp")
+
+
+ggplot()+
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites)+
+  geom_sf(data = breaches)+
+  coord_sf(xlim = c(-122.1, -121.6), ylim = c(38.0, 38.4))
+
+#winter
+
+ggplot()+
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites)+
+  geom_sf(data = breaches)+
+  coord_sf(xlim = c(-121.88, -121.82), ylim = c(38.02, 38.06))
+
+ggplot()+
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = PrioritySites)+
+  geom_sf(data = breaches)+
+  coord_sf(xlim = c(-121.88, -121.82), ylim = c(38.02, 38.06))
+
+#vegetation shapefile from Bailey
+
+vegshp = st_read("GIS dta/boundary_w_ss_yolo_07152026/boundary_w_ss_yolo_07152026.shp")
+
+
+ggplot()+
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = allsites,fill = "orange")+
+  geom_sf(data = vegshp, alpha = 0.3, fill = "green3")+
+  coord_sf(xlim = c(-122.2, -121.2), ylim = c(37.78, 38.7))
+
+#shapefiles from Shruti
+#oh, this is just what I gave here, minus the suisun sites
+extshr = st_read("GIS dta/Exteriors_Delta_UTM/Exteriors_Delta_UTM.shp")
+intshr = st_read("GIS dta/PrioritySites_Delta_UTM/PrioritySites_Delta_UTM.shp")
+ggplot()+
+  geom_sf(data = WW_Delta)+
+  geom_sf(data = intshr,fill = "orange")+
+  geom_sf(data = extshr, alpha = 0.3, fill = "green3")+
+  coord_sf(xlim = c(-122.0, -121.5), ylim = c(38, 38.4))
+
+
+vegarea1 = read_csv("GIS dta/RH_Exteriors_area_m2_2026-07-22.csv") %>%
+  mutate(Type = "Outside")
+
+vegarea2 = read_csv("GIS dta/RH_PrioritySites_area_m2_2026-07-22.csv") %>%
+  mutate(Type = "Inside")
+
+vegarea = bind_rows(vegarea1, vegarea2) %>%
+  pivot_longer(cols = c(water, SAV, whyacinth, spongeplant, emergent, NPV, wprimrose, shadow, EMPR, 
+                        alligweed, pennywort, FAV, land, soil, riparian), names_to = "VegType", values_to = "Area")
+
+mypal = c("green3", "yellowgreen", "darkgreen", "orange", "tan", "gold", "seagreen", "lightgreen", 
+          "darkolivegreen", "grey", "goldenrod4", "cyan3", "lightblue", "purple", "yellow")
+ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType)) + geom_area(position = "fill")+
+  facet_grid(Type~proj_name)+ scale_fill_manual(values = mypal)
+
+ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType)) + geom_area()+
+  facet_grid(Type~proj_name)+ scale_fill_manual(values = mypal)+
+  geom_hline(aes(yintercept = ttlSRarea))
+

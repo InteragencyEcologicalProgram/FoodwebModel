@@ -217,6 +217,17 @@ ggplot()+
   
   coord_sf(xlim = c(-122.01, -121.95), ylim = c(38.11, 38.14))
 
+#Add habitat types
+Bugs_allfilters = Bugs_allfilters %>%
+  mutate(TowType = replace_values(TowType, "NT" ~ "Neuston")) %>%
+  mutate(Habitat = case_when(TowType %in% c("Oblique", "Surface", "Bottom") ~ "Open Water",
+                             TowType %in% c("NT", "Neuston") ~ "Surface",
+                                         TowType == "SAV" | (TowType == "SN" & str_detect(SampleID, "SAV")) ~ "SAV",
+                                         TowType == "EAV" | (TowType == "SN" & str_detect(SampleID, "EAV")) ~ "EAV",
+                                         TowType == "FAV" | (TowType == "SN" & str_detect(SampleID, "FAV")) ~ "FAV",
+                                         TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic"))
+
+
 #OK, now consolidate by larger taxonomic groups ##########################
 #sample level information, to add zeros in later
 sample_info = Bugs_allfilters%>%

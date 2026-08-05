@@ -389,3 +389,19 @@ ggplot(Ins) +
 
 ggplot(Insects, aes(x = as.factor(Year), fill = Type)) + geom_histogram(stat = "count")+
   facet_wrap(~Project_na)
+
+
+#sigh
+empben = filter(Allbugs_Oct2025, Source == "EMP_Benthic")
+
+empben_sites = empben %>%
+  select(Station, Latitude, Longitude) %>%
+  distinct() %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
+
+load("~/FoodwebModel/data/PrioritySites.RData")
+ggplot()+
+  geom_sf(data = priority_buff_2k, fill = "lightblue", alpha = 0.5)+
+  geom_sf(data = empben_sites)+
+  geom_sf(data = PrioritySites, alpha = 0.5)
+

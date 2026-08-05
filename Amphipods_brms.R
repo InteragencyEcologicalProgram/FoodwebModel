@@ -360,6 +360,60 @@ save(m_gamarid5,m_gamarid5.1,  m_gamarid6, m_gamarid7, file = "outputs/gamarid_b
 
 #why is 2023 so different?
 
+
+
+m_gamarid14 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=gamarid_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+
+m_gamarid14.5 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat + 
+                                   Season+
+                                   (1|Source)+
+                                   (1|Year),
+                                 hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                   data=gamarid_data,
+                   family=hurdle_lognormal(),
+                   warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                   control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+
+m_gamarid15 <- brm(formula =  bf(CPUE ~ Type*Project_na+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=gamarid_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+m_gamarid16 <- brm(formula =  bf(CPUE ~ Type+Project_na+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=gamarid_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+loo(m_gamarid6, m_gamarid7, m_gamarid9, m_gamarid10, m_gamarid12, m_gamarid12.2, m_gamarid13, 
+    m_gamarid14, m_gamarid15, m_gamarid16)
+
+
+save.image()
+
+
 ######### corophiids ######################################
 
 
@@ -582,3 +636,72 @@ loo(m_corph6, m_corph7, m_corph9, m_corph10, m_corph12, m_corph12.2, m_corph13)
 # choose the model with the lowest complexity whose estimated predictive performance is within one standard error of the best performance
 
 summary(m_corph7)
+
+
+m_corph14 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=corph_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+
+m_corph14.5 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=corph_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+
+m_corph15 <- brm(formula =  bf(CPUE ~ Type*Project_na+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=corph_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+m_corph16 <- brm(formula =  bf(CPUE ~ Type+Project_na+Habitat + 
+                                 Season+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=corph_data,
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+loo(m_corph6, m_corph7, m_corph9, m_corph10, m_corph12, m_corph12.2, m_corph13, 
+    m_corph14, m_corph15, m_corph16)
+
+save.image()
+
+
+#what's up with Decker?
+
+Decker = filter(Amphipoda, Region == "Decker")
+
+ggplot(Decker, aes(x = Date, y = CPUE))+ geom_point()
+ggplot(Amphipoda, aes(x = Date, y = CPUE)) + geom_point()
+
+#check the origional dataset
+
+
+Sites = read_csv("https://pasta.lternet.edu/package/data/eml/edi/269/6/ce64ec720105ebc3d887e511965e1095")
+bugs= read_csv("https://pasta.lternet.edu/package/data/eml/edi/269/6/3629422e81cc00359261e13a921b78b9")
+Sweeps = left_join(Sites, bugs) %>%
+  filter(GearTypeAbbreviation == "SN", Location == "Decker Island")
+#yup, there really were that many bugs
+#what would this model look like if i removed those three outliers?

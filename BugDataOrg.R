@@ -181,6 +181,41 @@ Bugs_allfilters = Bugs_spatialfilters %>%
   filter((Type == "Inside" & (is.na(`Restoration Date`) | Date > `Restoration Date` ) )| Type == "Outside") %>%
   filter(Year > 2016, Year < 2024)
 
+#add distance to nearest breach
+
+breaches = st_read("GIS dta/breaches/Breach_Midpoints_2.shp") %>%
+  filter(!is.na(EcologBrea)) %>%
+  mutate(BreachNo = c(1:130)) %>%
+  st_transform(crs = 4326) %>%
+  dplyr::mutate(Longitude = sf::st_coordinates(.)[,1],
+                Latitude = sf::st_coordinates(.)[,2])
+
+
+Bugs_allfilters_sf = Bugs_allfilters %>%
+  select(Longitude, Latitude, SampleID) %>%
+  distinct() %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = F) 
+
+bdist =Bugs_allfilters_sf  %>%
+st_nearest_feature(st_transform(breaches, crs = 4326))
+
+# library(spacetools)
+Bugs_allfilters_sf = mutate(Bugs_allfilters_sf, NearestBreach = breaches$BreachNo[bdist])
+
+
+ggplot()+
+  geom_sf(data = spacetools::Delta)+
+  geom_sf(data = breaches)+
+  coord_sf(xlim = c(-121.57, -122.1), ylim = c(38, 38.4))
+
+breachesbugs = breaches[bdist,]
+
+distancestobreaches = st_distance(Bugs_allfilters_sf, breachesbugs, by_element = T)
+
+Bugs_allfilters_sf = mutate(Bugs_allfilters_sf, DistanceToBreach = distancestobreaches)
+
+Bugs_allfilters = left_join(Bugs_allfilters, Bugs_allfilters_sf)
+
 table(Bugs_allfilters$Region, Bugs_allfilters$Year,  Bugs_allfilters$Type)
 #some qc
 table(Bugs_allfilters$Project_na, Bugs_allfilters$Year)

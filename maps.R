@@ -101,7 +101,8 @@ EMPben_sites = select(EMPben, Station, Latitude, Longitude) %>%
 
 #breach locations ###############################
 
-breaches = st_read("GIS dta/breaches/Breach_Midpoints.shp")
+breaches = st_read("GIS dta/breaches/Breach_Midpoints_2.shp") %>%
+  filter(!is.na(EcologBrea)) %>%
 
 
 ggplot()+
@@ -164,4 +165,22 @@ ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType)) + geom_area(position = 
 ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType)) + geom_area()+
   facet_grid(Type~proj_name)+ scale_fill_manual(values = mypal)+
   geom_hline(aes(yintercept = ttlSRarea))
+
+vegarea_bg = filter(vegarea, VegType %in% c("water", "SAV","land", "emergent", "NPV", "shadow",  
+                                             "FAV", "soil", "riparian"))
+
+vegpal = c("water" = "lightblue", "FAV" = "green3", "emergent"= "darkgreen", land = "tan",NPV =  "gold", "SAV" = "lightgreen", 
+                   "riparian" =  "darkolivegreen","shadow"= "grey","soil"= "goldenrod4")
+
+
+ggplot(vegarea_bg, aes(x = yyyy, y = Area, fill = VegType)) + geom_area()+
+  facet_grid(Type~proj_name)+ scale_fill_manual(values = vegpal)+
+  geom_point(aes(y = ttlSRarea))
+
+ggplot(vegarea_bg, aes(x = yyyy, y = Area, fill = VegType)) + geom_area(position = "fill")+
+  facet_grid(Type~proj_name)+ scale_fill_manual(values = vegpal)
+
+test = vegarea_bg  %>%
+  group_by(yyyy, VegType) %>%
+  summarize(tot = sum(Area, na.rm =T))
 

@@ -94,7 +94,7 @@ names(Bugs_allfilters)
 sample_meta <- Bugs_allfilters %>%
   distinct(SampleID, .keep_all = TRUE) %>%
   select(SampleID, Project_na, Type, Region, Source, Date, Year, Month,
-         Station, TowType, Longitude, Latitude,
+         Station, TowType, Habitat, Longitude, Latitude,
          Secchi, Temperature, Chlorophyll, SalSurf, SalBott, TurbidityNTU)  # need other env data?``
 # wind up 7,733 unique SampleIDs
 
@@ -211,6 +211,14 @@ ggplot(diversity_long, aes(x = Source, y = value)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(x = NULL, y = NULL, title = "Insect diversity by sampling method")
+
+## habitat diversity ------
+ggplot(diversity_long, aes(x = Habitat, y = value)) +
+  geom_boxplot(fill = "darkgreen", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity by habitat")
 
 # re-group ----
 ## sample methods -----

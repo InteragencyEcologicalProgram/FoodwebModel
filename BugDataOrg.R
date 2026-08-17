@@ -9,11 +9,23 @@ library(sf)
 library(deltamapr)
 library(readxl)
 
+
+
+fishpal = c("grey", "yellow", "black", "orange", "darkblue", "salmon", "skyblue", "yellowgreen", "firebrick", "purple", "darkorange",
+            "cyan3", "sienna", "green3", "pink", "darkgreen", "cyan")
+
+zoopal = c("grey34", "yellow3", "brown", "orange3", "blue", "salmon3", "slateblue", "green", "red", "pink3", 
+           "darkorange3",
+           "cyan4", "sienna2", "darkolivegreen", "slategrey", "chartreuse", "orchid")
+
+
 #load integrated bug dataset
 load('data/AllWetlandBugs_2010onwards.RData')
 
 #check that I have all the data I think i do
-table(Allbugs_Oct2025$Source, Allbugs_Oct2025$Year)
+table(Allbugs_Mar2026$Source, Allbugs_Mar2026$Year)
+glimpse(Allbugs_Mar2026)
+
 
 library(zooper)
 newdat = Zoopsynther(Data_type = "Community", Sources = c("EMP","FMWT", "STN"),
@@ -264,6 +276,18 @@ Bugs_allfilters = Bugs_allfilters %>%
                                          TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic")) 
 
 
+#fix incorrect rotifer groups
+wrongrotifers = Bugs_allfilters %>%
+  filter(Genus == "Trichotria" | Genus == "Wolga") |> select(Phylum:Species) |> arrange(Phylum, Order, Family)
+
+Bugs_allfilters = mutate(Bugs_allfilters,
+                         Phylum = case_when(Family == "Trichotriidae" ~ "Rotifera",
+                                            TRUE ~ Phylum),
+                         Class= case_when(Family == "Trichotriidae" ~ "Eurotatoria",
+                                          TRUE ~ Class),
+                         Order = case_when(Family == "Trichotriidae" ~ "Ploima",
+                                           TRUE ~ Order))
+
 #OK, now consolidate by larger taxonomic groups ##########################
 #sample level information, to add zeros in later
 sample_info = Bugs_allfilters%>%
@@ -452,3 +476,7 @@ Hemiptera = filter(Bugs_allfilters, Order == "Hemiptera", CPUE !=0)
 Diptera = filter(Bugs_allfilters, Order == "Diptera", CPUE !=0) 
 
 ggplot(Diptera) + aes(x = Region, y = CPUE, fill = Family) + geom_col(position = "fill")
+
+zoops = filter(Bugs_allfilters, SizeClass == "Meso", Class == "Copepoda", !is.na(Genus))
+ggplot(zoops, aes(x = Project_na, y = CPUE, fill = Genus)) + geom_col(position = "fill")+
+  scale_fill_manual(values = c(fishpal, zoopal))

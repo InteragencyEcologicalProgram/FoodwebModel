@@ -398,6 +398,44 @@ write.csv(Cyclopoids, file = "data/Cyclopoids.csv", row.names = F)
 write.csv(Amphipoda, file = "data/Amphipods.csv", row.names = F)
 write.csv(Cladocera, file = "data/Cladocera.csv", row.names = F)
 
+# extra datasets to parse zooplankton by functional group ################
+#unidentified juvenile copepods are currently excluded, since most of the more abundant species are currently ID'd
+
+badcop = filter(Bugs_allfilters, Order %in%c("Cyclopoida","Calanoida")) %>%
+                  filter(Genus%in%c("Acanthocyclops","Tortanus","Acartia","Acartiella"))%>%
+                  group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
+                           Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
+                           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+                  summarize(CPUE = sum(CPUE, na.rm = T)) %>%
+                  left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
+                  mutate(Taxon = "PredCop", CPUE = case_when(is.na(CPUE) ~ 0,
+                                                             TRUE ~ CPUE))
+goodcop = filter(Bugs_allfilters, Order %in%c("Cyclopoida","Calanoida")) %>%
+  filter(Genus%in%c("Eurytemora","Pseudodiaptomus","Sinocalanus"))%>%
+  group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
+           Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
+           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+  summarize(CPUE = sum(CPUE, na.rm = T)) %>%
+  left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
+  mutate(Taxon = "NonPredCop", CPUE = case_when(is.na(CPUE) ~ 0,
+                                              TRUE ~ CPUE))
+
+weirdcop = filter(Bugs_allfilters, Genus == "Limnoithona") %>%
+  group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
+           Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
+           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+  summarize(CPUE = sum(CPUE, na.rm = T)) %>%
+  left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
+  mutate(Taxon = "Limnoithona", CPUE = case_when(is.na(CPUE) ~ 0,
+                                              TRUE ~ CPUE))
+
+save(goodcop, file = "data/NonPredatoryCopepods.RData")
+save(badcop, file = "data/PredatoryCopepods.RData")
+save(weirdcop, file = "data/Limnoithona.RData")
+
+write.csv(goodcop, file = "data/NonPredatoryCopepods.csv", row.names = F)
+write.csv(badcop, file = "data/PredatoryCopepods.csv", row.names = F)
+write.csv(weirdcop, file = "data/Limnoithona.csv", row.names = F)
 
 #exploritory plots of each dataset ################################
 load("data/Bivalves.RData")

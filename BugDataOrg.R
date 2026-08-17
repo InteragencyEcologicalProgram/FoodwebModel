@@ -254,13 +254,14 @@ ggplot()+
 
 #Add habitat types
 Bugs_allfilters = Bugs_allfilters %>%
+  st_drop_geometry() %>%
   mutate(TowType = replace_values(TowType, "NT" ~ "Neuston")) %>%
   mutate(Habitat = case_when(TowType %in% c("Oblique", "Surface", "Bottom") ~ "Open Water",
                              TowType %in% c("NT", "Neuston") ~ "Surface",
                                          TowType == "SAV" | (TowType == "SN" & str_detect(SampleID, "SAV")) ~ "SAV",
                                          TowType == "EAV" | (TowType == "SN" & str_detect(SampleID, "EAV")) ~ "EAV",
                                          TowType == "FAV" | (TowType == "SN" & str_detect(SampleID, "FAV")) ~ "FAV",
-                                         TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic"))
+                                         TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic")) 
 
 
 #OK, now consolidate by larger taxonomic groups ##########################
@@ -268,13 +269,13 @@ Bugs_allfilters = Bugs_allfilters %>%
 sample_info = Bugs_allfilters%>%
   select(SampleID, Longitude, Latitude, Region, Project_na, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Volume) %>%
+           TurbidityFNU, SizeClass, Volume, Habitat, DistanceToBreach) %>%
   distinct()
 
 Cyclopoids = filter(Bugs_allfilters, Order == "Cyclopoida") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+           TurbidityFNU, SizeClass, Lifestage,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
   mutate(Taxon = "Cyclopoid", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -284,7 +285,7 @@ Cyclopoids = filter(Bugs_allfilters, Order == "Cyclopoida") %>%
 Calanoids = filter(Bugs_allfilters, Order == "Calanoida") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+           TurbidityFNU, SizeClass, Lifestage,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
 left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
   mutate(Taxon = "Calanoid", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -297,7 +298,7 @@ left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #rem
 Amphipoda = filter(Bugs_allfilters, Order == "Amphipoda") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Family,Volume) %>%
+           TurbidityFNU, SizeClass, Family,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info, !(SizeClass  %in% c("Meso", "Micro") & Source %in% c("EMP", "FMWT", "STN", "20mm")))) %>% #remove zoop samples that don't count amphipods
   mutate(Taxon = "Amphipod", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -307,7 +308,7 @@ Amphipoda = filter(Bugs_allfilters, Order == "Amphipoda") %>%
                                TRUE ~ "Other")) %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, AmphGroup,Volume) %>%
+           TurbidityFNU, SizeClass, AmphGroup,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #now cladocera
@@ -315,7 +316,7 @@ Amphipoda = filter(Bugs_allfilters, Order == "Amphipoda") %>%
 Cladocera = filter(Bugs_allfilters, Class == "Branchiopoda") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+           TurbidityFNU, SizeClass, Lifestage,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
   mutate(Taxon = "Cladocera", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -326,7 +327,7 @@ Cladocera = filter(Bugs_allfilters, Class == "Branchiopoda") %>%
 Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass,Volume, Family) %>%
+           TurbidityFNU, SizeClass,Volume, Family, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info,  !(SizeClass  %in% c("Meso", "Micro") & Source %in% c("EMP", "FMWT", "STN", "20mm")))) %>% #remove zoop samples that don't count amphipods
   mutate(Taxon = "Insect", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -335,7 +336,7 @@ Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
                                TRUE ~ "Other"))%>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, InsectGroup,Volume) %>%
+           TurbidityFNU, SizeClass, InsectGroup,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #Bivalves
@@ -343,7 +344,7 @@ Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
 Bivalves = filter(Bugs_allfilters, TowType %in% c("PVC", "PPG", "Ponar"), Class == "Bivalvia") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass,Volume, Family) %>%
+           TurbidityFNU, SizeClass,Volume, Family, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info,  TowType %in% c("PVC", "PPG", "Ponar"))) %>% 
   mutate(Taxon = "Bivalves", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -353,7 +354,7 @@ Bivalves = filter(Bugs_allfilters, TowType %in% c("PVC", "PPG", "Ponar"), Class 
                                  TRUE ~ "Other"))%>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, ClamGroup,Volume) %>%
+           TurbidityFNU, SizeClass, ClamGroup,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #save all outputs ##############################
@@ -440,3 +441,14 @@ ggplot()+
   geom_sf(data = empben_sites)+
   geom_sf(data = PrioritySites, alpha = 0.5)
 
+insectsX = filter(Bugs_allfilters, Class == "Insecta") %>%
+  group_by(Order) %>%
+  summarize(CPUE = sum(CPUE))
+
+ephem = filter(Bugs_allfilters, Order == "Ephemeroptera", CPUE !=0) 
+
+Hemiptera = filter(Bugs_allfilters, Order == "Hemiptera", CPUE !=0) 
+
+Diptera = filter(Bugs_allfilters, Order == "Diptera", CPUE !=0) 
+
+ggplot(Diptera) + aes(x = Region, y = CPUE, fill = Family) + geom_col(position = "fill")

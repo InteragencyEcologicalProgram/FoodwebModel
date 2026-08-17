@@ -184,3 +184,10 @@ test = vegarea_bg  %>%
   group_by(yyyy, VegType) %>%
   summarize(tot = sum(Area, na.rm =T))
 
+
+ggplot(test, aes(x = yyyy, y =tot, fill = VegType)) + geom_area(position = "fill")+ 
+  scale_fill_manual(values = vegpal)
+
+ggplot(test, aes(x = yyyy, y =tot, fill = VegType)) + geom_area()+ 
+  scale_fill_manual(values = vegpal) +
+  facet_wrap(~VegType, scales = "free_y")

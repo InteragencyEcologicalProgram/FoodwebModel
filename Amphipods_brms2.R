@@ -57,7 +57,9 @@ get_coef_draws <- function(fit, model_name) {
 load("data/Amphipods.RData")
 glimpse(Amphipoda)
 
-gamarid_data <- Amphipoda%>%
+Amphipoda2 = filter(Amphipoda, !(CPUE>6000 & TowType == "SN"))
+
+gamarid_data <- Amphipoda2%>%
   filter(AmphGroup == "Gammaridae and friends", SizeClass == "Macro") %>%
   mutate(Month = month(Date),
     Season = case_when(Month %in% c(3,4,5)~ "Spring",
@@ -234,7 +236,7 @@ m_gamarid4.1 <- brm(formula =  bf(CPUE ~ Type*Project_na +
                   control=list(adapt_delta=0.99))
 #so having region and project gives the problem. Which makes sense becasue each project is only in one region
 
-m_gamarid5 <- brm(formula =  bf(CPUE ~ Type*Region + 
+m_gamarid5a <- brm(formula =  bf(CPUE ~ Type*Region + 
                                   (1|Source)+
                                   (1|Year),
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
@@ -244,14 +246,19 @@ m_gamarid5 <- brm(formula =  bf(CPUE ~ Type*Region +
                   control=list(adapt_delta=0.99))
 #oh, way better 
 
+summary(m_gamarid5a)
 summary(m_gamarid5)
+plot(m_gamarid5a)
 plot(m_gamarid5)
 mcmc_plot(m_gamarid5)
+mcmc_plot(m_gamarid5a)
+
 plot(conditional_effects(m_gamarid5),theme=theme_bw())
+plot(conditional_effects(m_gamarid5a),theme=theme_bw())
 pp_check(m_gamarid5, type = "loo_pit_overlay")
 # really need to figure out what this means. 
 
-m_gamarid5.1 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
+m_gamarid5.1a <- brm(formula =  bf(CPUE ~ Type*Region + Season +
                                   (1|Source)+
                                   (1|Year),
                                 hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
@@ -261,7 +268,7 @@ m_gamarid5.1 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
                   control=list(adapt_delta=0.99))
 #oh, way better 
 
-summary(m_gamarid5.1)
+summary(m_gamarid5.1a)
 plot(m_gamarid5.1)
 mcmc_plot(m_gamarid5.1)
 plot(conditional_effects(m_gamarid5.1),theme=theme_bw())
@@ -313,7 +320,7 @@ gamarid_data = mutate(gamarid_data, Habitat = case_when(TowType %in% c("Oblique"
 
 
 
-m_gamarid7 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
+m_gamarid7a <- brm(formula =  bf(CPUE ~ Type*Region + Season +
                                   Habitat+
                                   # Region + 
                                   (1|Source)+
@@ -326,7 +333,7 @@ m_gamarid7 <- brm(formula =  bf(CPUE ~ Type*Region + Season +
 
 
 
-m_gamarid8 <- brm(formula =  bf(CPUE ~ Type+Region + Season +
+m_gamarid8a <- brm(formula =  bf(CPUE ~ Type+Region + Season +
                                   Habitat+
                                   # Region + 
                                   (1|Source)+
@@ -337,7 +344,7 @@ m_gamarid8 <- brm(formula =  bf(CPUE ~ Type+Region + Season +
                   warmup=1000,iter=3000,chains=3,cores=15,thin=10,
                   control=list(adapt_delta=0.99), backend = "cmdstanr")
 
-m_gamarid9 <- brm(formula =  bf(CPUE ~ Type+Region + 
+m_gamarid9a <- brm(formula =  bf(CPUE ~ Type+Region + 
                                   Habitat+
                                   # Region + 
                                   (1|Source)+
@@ -348,19 +355,18 @@ m_gamarid9 <- brm(formula =  bf(CPUE ~ Type+Region +
                   warmup=1000,iter=3000,chains=3,cores=15,thin=10,
                   control=list(adapt_delta=0.99), backend = "cmdstanr")
 
-loo(m_gamarid5,m_gamarid5.1,  m_gamarid6, m_gamarid7, m_gamarid8, m_gamarid9)
+loo(m_gamarid5a,m_gamarid5.1a,  m_gamarid6a, m_gamarid7a, m_gamarid8a, m_gamarid9a)
 #7 is the best!
 
-summary(m_gamarid7)
-plot(m_gamarid7)
-mcmc_plot(m_gamarid7)
-plot(conditional_effects(m_gamarid7),theme=theme_bw())
-pp_check(m_gamarid7, type = "loo_pit_overlay")
-save(m_gamarid5,m_gamarid5.1,  m_gamarid6, m_gamarid7, file = "outputs/gamarid_brms.RData")
+summary(m_gamarid7a)
+plot(m_gamarid7a)
+mcmc_plot(m_gamarid7a)
+plot(conditional_effects(m_gamarid7a),theme=theme_bw())
+pp_check(m_gamarid7a, type = "loo_pit_overlay")
 
 #why is 2023 so different?
 
-
+fav = filter(gamarid_data, Habitat == "FAV")
 
 m_gamarid14 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat + 
                                  Season+
@@ -373,6 +379,11 @@ m_gamarid14 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat +
                  control=list(adapt_delta=0.99), backend = "cmdstanr")
 
 
+summary(m_gamarid14)
+plot(m_gamarid14)
+mcmc_plot(m_gamarid14)
+plot(conditional_effects(m_gamarid14),theme=theme_bw())
+pp_check(m_gamarid14, type = "loo_pit_overlay")
 
 m_gamarid14.5 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat + 
                                    Season+
@@ -386,6 +397,17 @@ m_gamarid14.5 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat +
 
 
 
+m_gamarid14.6 <- brm(formula =  bf(CPUE ~ Region*Habitat + 
+                                     Season+
+                                     (1|Source)+
+                                     (1|Year),
+                                   hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                     data=gamarid_data,
+                     family=hurdle_lognormal(),
+                     warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                     control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
 m_gamarid15 <- brm(formula =  bf(CPUE ~ Type*Project_na+Habitat + 
                                  Season+
                                  (1|Source)+
@@ -396,6 +418,12 @@ m_gamarid15 <- brm(formula =  bf(CPUE ~ Type*Project_na+Habitat +
                  warmup=1000,iter=3000,chains=3,cores=15,thin=10,
                  control=list(adapt_delta=0.99), backend = "cmdstanr")
 
+
+summary(m_gamarid15)
+plot(m_gamarid15)
+mcmc_plot(m_gamarid15)
+plot(conditional_effects(m_gamarid15),theme=theme_bw())
+pp_check(m_gamarid15, type = "loo_pit_overlay")
 
 m_gamarid16 <- brm(formula =  bf(CPUE ~ Type+Project_na+Habitat + 
                                  Season+
@@ -412,6 +440,9 @@ loo(m_gamarid6, m_gamarid7, m_gamarid9, m_gamarid10, m_gamarid12, m_gamarid12.2,
 
 
 save.image()
+save(m_gamarid5,m_gamarid5.1, m_gamarid5a, m_gamarid5.1a,  m_gamarid6, m_gamarid7, m_gamarid7a,
+     m_gamarid6, m_gamarid7, m_gamarid9, 
+     m_gamarid14, m_gamarid15, m_gamarid16, file = "outputs/gamarid_brms.RData")
 
 
 ######### corophiids ######################################
@@ -648,6 +679,11 @@ m_corph14 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat +
                  warmup=1000,iter=3000,chains=3,cores=15,thin=10,
                  control=list(adapt_delta=0.99), backend = "cmdstanr")
 
+summary(m_corph14)
+plot(m_corph14)
+mcmc_plot(m_corph14)
+plot(conditional_effects(m_corph14),theme=theme_bw())
+pp_check(m_corph15, type = "loo_pit_overlay")
 
 
 m_corph14.5 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat + 
@@ -673,6 +709,13 @@ m_corph15 <- brm(formula =  bf(CPUE ~ Type*Project_na+Habitat +
                  control=list(adapt_delta=0.99), backend = "cmdstanr")
 
 
+summary(m_corph15)
+plot(m_corph15)
+mcmc_plot(m_corph15)
+plot(conditional_effects(m_corph15),theme=theme_bw())
+pp_check(m_corph15, type = "loo_pit_overlay")
+
+
 m_corph16 <- brm(formula =  bf(CPUE ~ Type+Project_na+Habitat + 
                                  Season+
                                  (1|Source)+
@@ -688,6 +731,9 @@ loo(m_corph6, m_corph7, m_corph9, m_corph10, m_corph12, m_corph12.2, m_corph13,
 
 save.image()
 
+
+save(m_corph5, m_corph5.1, m_corph6, m_corph7,m_corph9, m_corph10, m_corph12, m_corph12.2, m_corph13, 
+     m_corph14, m_corph15, m_corph16, file = "outputs/corophiumods.RData")
 
 #what's up with Decker?
 
@@ -709,3 +755,249 @@ Sweeps = left_join(Sites, bugs) %>%
 test = filter(Decker, CPUE>6000)
 test2 = filter(Amphipoda, CPUE >6000)
 #all the other really high abundances are benthic.
+
+
+#best model has project, but second best has region. I just think regeion makes more sense. 
+
+#other people just did spring ##############################################################
+m_corph14_spring <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+                                 (1|Source)+
+                                 (1|Year),
+                               hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                 data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                 family=hurdle_lognormal(),
+                 warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                 control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+summary(m_corph14_spring)
+plot(m_corph14_spring)
+mcmc_plot(m_corph14_spring)
+plot(conditional_effects(m_corph14_spring),theme=theme_bw())
+pp_check(m_corph14_spring, type = "loo_pit_overlay")
+
+m_gam14_spring <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+                                        (1|Source)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+summary(m_gam14_spring)
+plot(m_gam14_spring)
+mcmc_plot(m_gam14_spring)
+plot(conditional_effects(m_gam14_spring),theme=theme_bw())
+pp_check(m_gam14_spring, type = "loo_pit_overlay")
+
+#baysian pvalue fucntion
+source("compute_pv.R")
+
+mgam14_sp_pvalues = compute_bpv(m_gam14_spring)
+
+
+mcorph14_sp_pvalues = compute_bpv(m_corph14_spring)
+hist(filter(gamarid_data, Season == "Spring")$CPUE)
+hist(log(filter(gamarid_data, Season == "Spring")$CPUE+1))
+
+
+hist(filter(corph_data, Season == "Spring")$CPUE)
+hist(log(filter(corph_data, Season == "Spring")$CPUE+1))
+gamresid = resid(m_gam14_spring)
+hist(gamresid)
+
+
+ggplot(filter(gamarid_data, Season == "Spring"), aes(x = yday(Date), y = log(CPUE+1))) + geom_point()+ geom_smooth()+
+  facet_wrap(~Habitat, scales = "free_y")
+
+ggplot(filter(corph_data, Season == "Spring"), aes(x = yday(Date), y = log(CPUE+1))) + geom_point()+ geom_smooth()+
+  facet_wrap(~Habitat, scales = "free_y")
+#yeah, ditch the benthic samples
+
+
+#OK, good models for model seleciton table with the good dataset. ######################
+
+
+m_gam14_springA1 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat+
+                                       (1|Source)+ (1|Project_na)+
+                                       (1|Year),
+                                     hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+# m_gam14_springA <- brm(formula =  bf(CPUE ~ Type+Region+Habitat+
+#                                       (1|Source)+
+#                                       (1|Year),
+#                                     hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+#                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+#                       family=hurdle_lognormal(),
+#                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+# #                       control=list(adapt_delta=0.99), backend = "cmdstanr")
+# 
+# m_gam14_springB <- brm(formula =  bf(CPUE ~ Region+Habitat+
+#                                        (1|Source)+
+#                                        (1|Year),
+#                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+#                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+#                        family=hurdle_lognormal(),
+#                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+#                        control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+m_gam14_springB1 <- brm(formula =  bf(CPUE ~ Region+Habitat+
+                                       (1|Source)+ (1|Project_na)+
+                                       (1|Year),
+                                     hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+# m_gam14_springC <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+#                                        (1|Source)+
+#                                        (1|Year),
+#                                      hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+#                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+#                        family=hurdle_lognormal(),
+#                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+#                        control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+m_gam14_springC1 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+                                       (1|Source)+ (1|Project_na)+
+                                       (1|Year),
+                                     hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+# m_gam14_springD <- brm(formula =  bf(CPUE ~ Type+Habitat+
+#                                        (1|Source)+
+#                                        (1|Year),
+#                                      hu ~ 1+Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+#                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+#                        family=hurdle_lognormal(),
+#                        warmup=1000,iter=6000,chains=3,cores=15,thin=10,
+#                        control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+m_gam14_springD1 <- brm(formula =  bf(CPUE ~ Type+Habitat+
+                                       (1|Source)+ (1|Project_na)+
+                                       (1|Year),
+                                     hu ~ 1+Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+# 
+# m_gam14_springE <- brm(formula =  bf(CPUE ~Habitat+
+#                                        (1|Source)+
+#                                        (1|Year),
+#                                      hu ~ 1+Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+#                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+#                        family=hurdle_lognormal(),
+#                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+#                        control=list(adapt_delta=0.99), backend = "cmdstanr")
+
+
+m_gam14_springE1 <- brm(formula =  bf(CPUE ~Habitat+
+                                       (1|Source)+
+                                       (1|Year) + (1|Project_na),
+                                     hu ~ 1+Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+m_gam14_springF1 <- brm(formula =  bf(CPUE ~Region+
+                                       (1|Source)+(1|Project_na)+
+                                       (1|Year),
+                                     hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+# 
+# m_gam14_springF1 <- brm(formula =  bf(CPUE ~Region+
+#                                        (1|Source)+
+#                                        (1|Year),
+#                                      hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+#                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+#                        family=hurdle_lognormal(),
+#                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+#                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+m_gam14_spring1 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+m_gam14_springG1 <- brm(formula =  bf(CPUE ~ Type+Region*Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+m_gam14_springH1 <- brm(formula =  bf(CPUE ~Region*Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+m_gam14_spring_null <- brm(formula =  bf(CPUE ~ 1+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(gamarid_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+loo(m_gam14_springA, m_gam14_springB, m_gam14_springC, m_gam14_springD, m_gam14_springE, m_gam14_springF, m_gam14_spring)
+
+# Model comparisons:
+#   elpd_diff se_diff
+# m_gam14_spring     0.0       0.0 
+# m_gam14_springA  -12.5       6.3 
+# m_gam14_springB  -15.1       7.3 
+# m_gam14_springD  -20.2       8.3 
+# m_gam14_springE  -21.2       8.7 
+# m_gam14_springC  -31.6       6.0 
+# m_gam14_springF -352.2      26.1 
+
+loo(m_gam14_springA, m_gam14_springB, m_gam14_springC, m_gam14_springD, m_gam14_springE, m_gam14_springF, m_gam14_spring,
+    m_gam14_springA1, m_gam14_springB1, m_gam14_springC1, m_gam14_springD1, m_gam14_springE1, m_gam14_springF1, m_gam14_spring1,
+    m_gam14_springH1,m_gam14_springG1)
+
+
+loo(m_gam14_springA1, m_gam14_springB1, m_gam14_springC1, m_gam14_springD1, m_gam14_springE1, m_gam14_springF1, m_gam14_spring1,
+    m_gam14_springH1,m_gam14_springG1,m_gam14_spring_null , moment_match = TRUE)
+
+# Model comparisons:
+#   elpd_diff se_diff
+# m_gam14_spring1     0.0       0.0   Type*Region+Habitat+ hu(Habitat)
+# m_gam14_springD1  -10.0       6.0   Type+Habitat+ hu(Habitat)
+# m_gam14_springA1  -10.5       5.9   Type+Region+Habitat+ hu(Habitat)
+# m_gam14_springG1  -14.4       7.1   Type+Region*Habitat+ hu(Habitat)
+# m_gam14_springE1  -15.4       7.5   Habitat+ hu(Habitat)
+# m_gam14_springB1  -16.5       7.4   Region+Habitat+ hu(Habitat)
+# m_gam14_springH1  -20.0       8.2   Region*Habitat+hu(Habitat) - odd that this one didnt' do so good
+# m_gam14_springC1  -32.2       6.0   Type*Region+Habitat
+# m_gam14_springF1 -360.9      26.3   Region
+
+#I still need to estimate biomass. 

@@ -94,7 +94,7 @@ names(Bugs_allfilters)
 sample_meta <- Bugs_allfilters %>%
   distinct(SampleID, .keep_all = TRUE) %>%
   select(SampleID, Project_na, Type, Region, Source, Date, Year, Month,
-         Station, TowType, Longitude, Latitude,
+         Station, TowType, Habitat, Longitude, Latitude,
          Secchi, Temperature, Chlorophyll, SalSurf, SalBott, TurbidityNTU)  # need other env data?``
 # wind up 7,733 unique SampleIDs
 
@@ -211,6 +211,14 @@ ggplot(diversity_long, aes(x = Source, y = value)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(x = NULL, y = NULL, title = "Insect diversity by sampling method")
+
+## habitat diversity ------
+ggplot(diversity_long, aes(x = Habitat, y = value)) +
+  geom_boxplot(fill = "darkgreen", outlier.size = 0.5) +
+  facet_wrap(~ metric, scales = "free_x") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = NULL, y = NULL, title = "Insect diversity by habitat")
 
 # re-group ----
 ## sample methods -----
@@ -1003,3 +1011,276 @@ good_records <- meta_summary %>%
 
 good_records
 # one station?!
+
+# which orders are most common?
+
+Bugs_allfilters %>%
+  filter(Class == "Insecta") %>%
+  mutate(Order = if_else(is.na(Order), "unidentified", Order)) %>%
+  group_by(Order) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct = total_CPUE / sum(total_CPUE)) %>%
+  filter(pct >= 0.01) %>%
+  ggplot(aes(x = reorder(Order, pct), y = pct)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = scales::percent(pct, accuracy = 1)),
+            hjust = -0.15, size = 4.5) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.9)) +
+  theme_bw() +
+  labs(x = NULL, y = "Proportion of total CPUE",
+       title = "Insect catch composition by Order (total CPUE)")
+
+
+# plot pie chart
+Bugs_allfilters %>%
+  filter(Class == "Insecta") %>%
+  mutate(Order = if_else(is.na(Order), "unidentified", Order)) %>%
+  group_by(Order) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct   = total_CPUE / sum(total_CPUE),
+         Order = fct_reorder(Order, total_CPUE, .desc = TRUE),
+         label = if_else(pct >= 0.02, paste0(Order, "\n", scales::percent(pct, accuracy = 1)), "")) %>%
+  ggplot(aes(x = "", y = total_CPUE, fill = Order)) +
+  geom_col(width = 1, color = "white") +
+  geom_text(aes(x = 1.3, label = label), 
+          position = position_stack(vjust = 0.5), size = 4) +
+  coord_polar(theta = "y") +
+  theme_void() +
+  theme(legend.position = "right") +
+  labs(title = "Insect catch composition by Order (total CPUE)")
+
+# limit to Source*TowType that have <0.3 prop_zero
+good_methods_strict <- Bugs_allfilters %>%
+  filter(Class == "Insecta") %>%
+  group_by(Source, TowType, SampleID) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  group_by(Source, TowType) %>%
+  summarise(prop_zero = mean(sample_CPUE == 0), .groups = "drop") %>%
+  filter(prop_zero < 0.3) %>%
+  select(Source, TowType)
+
+Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Class == "Insecta") %>%
+  mutate(Order = if_else(is.na(Order), "unidentified", Order)) %>%
+  group_by(Order) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct   = total_CPUE / sum(total_CPUE),
+         Order = fct_reorder(Order, total_CPUE, .desc = TRUE),
+         label = if_else(pct >= 0.02, paste0(Order, "\n", scales::percent(pct, accuracy = 1)), "")) %>%
+  ggplot(aes(x = "", y = total_CPUE, fill = Order)) +
+  geom_col(width = 1, color = "white") +
+  geom_text(aes(x = 1.25, label = label), position = position_stack(vjust = 0.5), size = 4) +
+  coord_polar(theta = "y", clip = "off") +
+  theme_void() +
+  theme(legend.position = "right") +
+  labs(title = "Insect catch composition by Order (total CPUE)",
+       subtitle = "Sampling methods with prop_zero < 0.3 only")
+
+Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Class == "Insecta") %>%
+  mutate(Order = if_else(is.na(Order), "unidentified", Order)) %>%
+  group_by(Order) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct = total_CPUE / sum(total_CPUE),
+         Order = fct_reorder(Order, total_CPUE, .desc = TRUE),
+         label = if_else(pct >= 0.02, paste0(Order, "\n", scales::percent(pct, accuracy = 1)), "")) %>%
+  filter(pct >= 0.01) |> 
+  ggplot(aes(x = reorder(Order, pct), y = pct)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = scales::percent(pct, accuracy = 1)),
+            hjust = -0.15, size = 4.5) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.9)) +
+  theme_bw() +
+  labs(x = NULL, y = "Proportion of total CPUE",
+       title = "Insect catch composition by Order (total CPUE)",
+       subtitle = "Sampling methods with prop_zero < 0.3 only")
+
+Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Class == "Insecta",
+         Order %in% c("Diptera", "Trichoptera", "Ephemeroptera")) %>%
+  mutate(Family = if_else(is.na(Family), paste0(Order, "_unID"), Family)) %>%
+  group_by(Order, Family) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  group_by(Order) %>%
+  mutate(pct = total_CPUE / sum(total_CPUE)) %>%
+  ungroup() %>%
+  ggplot(aes(x = Order, y = pct, fill = Family)) +
+  geom_col(color = "white", linewidth = 0.3) +
+  geom_text(aes(label = if_else(pct >= 0.05, Family, "")),
+            position = position_stack(vjust = 0.5), size = 3.5) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs(x = NULL, y = "Proportion of order CPUE", fill = "Family",
+       title = "Family composition within focal insect orders",
+       subtitle = "Sampling methods with prop_zero < 0.3 only")
+
+# total CPUE for scaling everything to the same denominator
+total_cpue <- Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Class == "Insecta") %>%
+  summarise(total = sum(CPUE, na.rm = TRUE)) %>%
+  pull(total)
+
+# family-level breakdown for stacked orders
+stacked <- Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Class == "Insecta",
+         Order %in% c("Diptera", "Trichoptera", "Ephemeroptera")) %>%
+  mutate(Family = if_else(is.na(Family), paste0(Order, "_unID"), Family)) %>%
+  group_by(Order, Family) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct = total_CPUE / total_cpue)
+
+# order-level only for unstacked orders
+unstacked <- Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Class == "Insecta",
+         Order %in% c("Hemiptera", "Odonata")) %>%
+  group_by(Order) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  mutate(pct    = total_CPUE / total_cpue,
+         Family = Order)  # single fill color per bar
+
+bind_rows(stacked, unstacked) %>%
+  mutate(Order = factor(Order, levels = c("Diptera", "Trichoptera", 
+                                           "Ephemeroptera", "Hemiptera", "Odonata"))) %>%
+  ggplot(aes(x = Order, y = pct, fill = Family)) +
+  geom_col(color = "white", linewidth = 0.3) +
+  geom_text(aes(label = if_else(pct >= 0.02, Family, "")),
+            position = position_stack(vjust = 0.5), size = 3.5) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "right") +
+  guides(fill = guide_legend(ncol = 2)) +
+  labs(x = NULL, y = "Proportion of total insect CPUE", fill = "Family",
+       title = "Insect composition by Order and Family",
+       subtitle = "Sampling methods with prop_zero < 0.3 only")
+
+# insect families -----
+# Ephemeroptera, Trichoptera and Diptera are each dominated by a single family (Ephemerellidae, 
+# Trichotriidae and Chironomidae respectively). I want to look at what life stages dominate each 
+# of these 3 families and at the diversity of these families (ie genera and species). Then, I want 
+# to see how these vary temporally (season or month) and spatially (by region)
+
+## working dataset -----
+# base dataset for the three focal families plus the 3 common odonata families
+focal <- Bugs_allfilters %>%
+  semi_join(good_methods_strict, by = c("Source", "TowType")) %>%
+  filter(Family %in% c("Chironomidae", "Ephemerellidae", "Trichotriidae", 
+"Aeshnidae", "Coenagrionidae", "Gomphidae", "Libellulidae")) %>%
+  mutate(
+    Month    = month(Date, label = TRUE, abbr = TRUE),
+    Season   = case_when(
+      month(Date) %in% c(12, 1, 2)  ~ "Winter",
+      month(Date) %in% c(3, 4, 5)   ~ "Spring",
+      month(Date) %in% c(6, 7, 8)   ~ "Summer",
+      month(Date) %in% c(9, 10, 11) ~ "Fall"),
+    Season    = factor(Season, levels = c("Winter", "Spring", "Summer", "Fall")),
+    Lifestage = if_else(is.na(Lifestage), "unidentified", Lifestage)
+  )
+
+## life stage comp -----
+# life stage composition per family
+focal %>%
+  group_by(Family, Lifestage) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  group_by(Family) %>%
+  mutate(pct = total_CPUE / sum(total_CPUE)) %>%
+  ggplot(aes(x = Family, y = pct, fill = Lifestage)) +
+  geom_col(color = "white") +
+  geom_text(aes(label = scales::percent(pct, accuracy = 1)),
+            position = position_stack(vjust = 0.5), size = 4) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  labs(x = NULL, y = "Proportion of family CPUE", fill = "Life stage",
+       title = "Life stage composition of focal families")
+
+## finer tax res -----
+# genus/species diversity — what taxa are actually present?
+focal %>%
+  filter(!is.na(Genus)) %>%
+  distinct(Family, Genus, Species) %>%
+  arrange(Family, Genus, Species) %>%
+  print(n = 50)
+
+# summary counts
+focal %>%
+  group_by(Family) %>%
+  summarise(
+    n_genera  = n_distinct(Genus,   na.rm = TRUE),
+    n_species = n_distinct(Species, na.rm = TRUE),
+    .groups   = "drop"
+  )
+
+# CPUE by genus within each family
+focal %>%
+  filter(!is.na(Genus)) %>%
+  group_by(Family, Genus) %>%
+  summarise(total_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  group_by(Family) %>%
+  mutate(pct = total_CPUE / sum(total_CPUE)) %>%
+  ggplot(aes(x = reorder(Genus, pct), y = pct, fill = Family)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~ Family, scales = "free_y") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  labs(x = NULL, y = "Proportion of family CPUE",
+       title = "Genus composition within focal families")
+
+## temporal patterns -----
+# temporal patterns — mean CPUE per sample by season and month
+# seasonal — log1p y-axis
+focal %>%
+  filter(Family != "Trichotriidae") %>%  # drop pending data check
+  group_by(Family, SampleID, Season) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = Season, y = sample_CPUE, fill = Family)) +
+  geom_boxplot(outlier.size = 0.5) +
+  facet_wrap(~ Family, scales = "free_y") +
+  scale_y_continuous(trans  = "log1p",
+                     breaks = c(0, 1, 10, 100, 1000, 10000),
+                     labels = scales::comma) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = NULL, y = "CPUE per sample (log scale)",
+       title = "Seasonal CPUE — focal families")
+
+# monthly version (finer resolution)
+focal %>%
+  group_by(Family, SampleID, Month) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = Month, y = sample_CPUE, fill = Family)) +
+  geom_boxplot(outlier.size = 0.5) +
+  facet_wrap(~ Family, scales = "free_y") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = NULL, y = "CPUE per sample",
+       title = "Monthly CPUE — focal families")
+
+## spatial patterns -----
+# mean CPUE per sample by region
+# regional — log1p y-axis
+focal %>%
+  filter(Family != "Trichotriidae") %>%
+  group_by(Family, SampleID, Region) %>%
+  summarise(sample_CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = sample_CPUE, 
+             y = reorder(Region, sample_CPUE, median), fill = Family)) +
+  geom_boxplot(outlier.size = 0.5) +
+  facet_wrap(~ Family, scales = "free_x") +
+  scale_x_continuous(trans  = "log1p",
+                     breaks = c(0, 1, 10, 100, 1000, 10000),
+                     labels = scales::comma) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "CPUE per sample (log scale)", y = NULL,
+       title = "Regional CPUE — focal families")

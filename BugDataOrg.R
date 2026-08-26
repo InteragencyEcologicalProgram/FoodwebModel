@@ -9,11 +9,23 @@ library(sf)
 library(deltamapr)
 library(readxl)
 
+
+
+fishpal = c("grey", "yellow", "black", "orange", "darkblue", "salmon", "skyblue", "yellowgreen", "firebrick", "purple", "darkorange",
+            "cyan3", "sienna", "green3", "pink", "darkgreen", "cyan")
+
+zoopal = c("grey34", "yellow3", "brown", "orange3", "blue", "salmon3", "slateblue", "green", "red", "pink3", 
+           "darkorange3",
+           "cyan4", "sienna2", "darkolivegreen", "slategrey", "chartreuse", "orchid")
+
+
 #load integrated bug dataset
 load('data/AllWetlandBugs_2010onwards.RData')
 
 #check that I have all the data I think i do
-table(Allbugs_Oct2025$Source, Allbugs_Oct2025$Year)
+table(Allbugs_Mar2026$Source, Allbugs_Mar2026$Year)
+glimpse(Allbugs_Mar2026)
+
 
 library(zooper)
 newdat = Zoopsynther(Data_type = "Community", Sources = c("EMP","FMWT", "STN"),
@@ -181,6 +193,41 @@ Bugs_allfilters = Bugs_spatialfilters %>%
   filter((Type == "Inside" & (is.na(`Restoration Date`) | Date > `Restoration Date` ) )| Type == "Outside") %>%
   filter(Year > 2016, Year < 2024)
 
+#add distance to nearest breach
+
+breaches = st_read("GIS dta/breaches/Breach_Midpoints_2.shp") %>%
+  filter(!is.na(EcologBrea)) %>%
+  mutate(BreachNo = c(1:130)) %>%
+  st_transform(crs = 4326) %>%
+  dplyr::mutate(Longitude = sf::st_coordinates(.)[,1],
+                Latitude = sf::st_coordinates(.)[,2])
+
+
+Bugs_allfilters_sf = Bugs_allfilters %>%
+  select(Longitude, Latitude, SampleID) %>%
+  distinct() %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = F) 
+
+bdist =Bugs_allfilters_sf  %>%
+st_nearest_feature(st_transform(breaches, crs = 4326))
+
+# library(spacetools)
+Bugs_allfilters_sf = mutate(Bugs_allfilters_sf, NearestBreach = breaches$BreachNo[bdist])
+
+
+ggplot()+
+  geom_sf(data = spacetools::Delta)+
+  geom_sf(data = breaches)+
+  coord_sf(xlim = c(-121.57, -122.1), ylim = c(38, 38.4))
+
+breachesbugs = breaches[bdist,]
+
+distancestobreaches = st_distance(Bugs_allfilters_sf, breachesbugs, by_element = T)
+
+Bugs_allfilters_sf = mutate(Bugs_allfilters_sf, DistanceToBreach = distancestobreaches)
+
+Bugs_allfilters = left_join(Bugs_allfilters, Bugs_allfilters_sf)
+
 table(Bugs_allfilters$Region, Bugs_allfilters$Year,  Bugs_allfilters$Type)
 #some qc
 table(Bugs_allfilters$Project_na, Bugs_allfilters$Year)
@@ -219,27 +266,40 @@ ggplot()+
 
 #Add habitat types
 Bugs_allfilters = Bugs_allfilters %>%
+  st_drop_geometry() %>%
   mutate(TowType = replace_values(TowType, "NT" ~ "Neuston")) %>%
   mutate(Habitat = case_when(TowType %in% c("Oblique", "Surface", "Bottom") ~ "Open Water",
                              TowType %in% c("NT", "Neuston") ~ "Surface",
                                          TowType == "SAV" | (TowType == "SN" & str_detect(SampleID, "SAV")) ~ "SAV",
                                          TowType == "EAV" | (TowType == "SN" & str_detect(SampleID, "EAV")) ~ "EAV",
                                          TowType == "FAV" | (TowType == "SN" & str_detect(SampleID, "FAV")) ~ "FAV",
-                                         TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic"))
+                                         TowType %in% c("Ponar", "PPG", "PVC") ~ "Benthic")) 
 
+
+#fix incorrect rotifer groups
+wrongrotifers = Bugs_allfilters %>%
+  filter(Genus == "Trichotria" | Genus == "Wolga") |> select(Phylum:Species) |> arrange(Phylum, Order, Family)
+
+Bugs_allfilters = mutate(Bugs_allfilters,
+                         Phylum = case_when(Family == "Trichotriidae" ~ "Rotifera",
+                                            TRUE ~ Phylum),
+                         Class= case_when(Family == "Trichotriidae" ~ "Eurotatoria",
+                                          TRUE ~ Class),
+                         Order = case_when(Family == "Trichotriidae" ~ "Ploima",
+                                           TRUE ~ Order))
 
 #OK, now consolidate by larger taxonomic groups ##########################
 #sample level information, to add zeros in later
 sample_info = Bugs_allfilters%>%
   select(SampleID, Longitude, Latitude, Region, Project_na, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Volume) %>%
+           TurbidityFNU, SizeClass, Volume, Habitat, DistanceToBreach) %>%
   distinct()
 
 Cyclopoids = filter(Bugs_allfilters, Order == "Cyclopoida") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+           TurbidityFNU, SizeClass, Lifestage,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
   mutate(Taxon = "Cyclopoid", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -249,7 +309,7 @@ Cyclopoids = filter(Bugs_allfilters, Order == "Cyclopoida") %>%
 Calanoids = filter(Bugs_allfilters, Order == "Calanoida") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+           TurbidityFNU, SizeClass, Lifestage,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
 left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
   mutate(Taxon = "Calanoid", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -262,7 +322,7 @@ left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #rem
 Amphipoda = filter(Bugs_allfilters, Order == "Amphipoda") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Family,Volume) %>%
+           TurbidityFNU, SizeClass, Family,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info, !(SizeClass  %in% c("Meso", "Micro") & Source %in% c("EMP", "FMWT", "STN", "20mm")))) %>% #remove zoop samples that don't count amphipods
   mutate(Taxon = "Amphipod", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -272,7 +332,7 @@ Amphipoda = filter(Bugs_allfilters, Order == "Amphipoda") %>%
                                TRUE ~ "Other")) %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, AmphGroup,Volume) %>%
+           TurbidityFNU, SizeClass, AmphGroup,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #now cladocera
@@ -280,7 +340,7 @@ Amphipoda = filter(Bugs_allfilters, Order == "Amphipoda") %>%
 Cladocera = filter(Bugs_allfilters, Class == "Branchiopoda") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+           TurbidityFNU, SizeClass, Lifestage,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
   mutate(Taxon = "Cladocera", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -291,7 +351,7 @@ Cladocera = filter(Bugs_allfilters, Class == "Branchiopoda") %>%
 Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass,Volume, Family) %>%
+           TurbidityFNU, SizeClass,Volume, Family, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info,  !(SizeClass  %in% c("Meso", "Micro") & Source %in% c("EMP", "FMWT", "STN", "20mm")))) %>% #remove zoop samples that don't count amphipods
   mutate(Taxon = "Insect", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -300,7 +360,7 @@ Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
                                TRUE ~ "Other"))%>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, InsectGroup,Volume) %>%
+           TurbidityFNU, SizeClass, InsectGroup,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #Bivalves
@@ -308,7 +368,7 @@ Insects = filter(Bugs_allfilters, Class == "Insecta") %>%
 Bivalves = filter(Bugs_allfilters, TowType %in% c("PVC", "PPG", "Ponar"), Class == "Bivalvia") %>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass,Volume, Family) %>%
+           TurbidityFNU, SizeClass,Volume, Family, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T)) %>%
   left_join(filter(sample_info,  TowType %in% c("PVC", "PPG", "Ponar"))) %>% 
   mutate(Taxon = "Bivalves", CPUE = case_when(is.na(CPUE) ~ 0,
@@ -318,7 +378,7 @@ Bivalves = filter(Bugs_allfilters, TowType %in% c("PVC", "PPG", "Ponar"), Class 
                                  TRUE ~ "Other"))%>%
   group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
            Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
-           TurbidityFNU, SizeClass, ClamGroup,Volume) %>%
+           TurbidityFNU, SizeClass, ClamGroup,Volume, Habitat, DistanceToBreach) %>%
   summarize(CPUE = sum(CPUE, na.rm = T))
 
 #save all outputs ##############################
@@ -338,6 +398,44 @@ write.csv(Cyclopoids, file = "data/Cyclopoids.csv", row.names = F)
 write.csv(Amphipoda, file = "data/Amphipods.csv", row.names = F)
 write.csv(Cladocera, file = "data/Cladocera.csv", row.names = F)
 
+# extra datasets to parse zooplankton by functional group ################
+#unidentified juvenile copepods are currently excluded, since most of the more abundant species are currently ID'd
+
+badcop = filter(Bugs_allfilters, Order %in%c("Cyclopoida","Calanoida")) %>%
+                  filter(Genus%in%c("Acanthocyclops","Tortanus","Acartia","Acartiella"))%>%
+                  group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
+                           Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
+                           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+                  summarize(CPUE = sum(CPUE, na.rm = T)) %>%
+                  left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
+                  mutate(Taxon = "PredCop", CPUE = case_when(is.na(CPUE) ~ 0,
+                                                             TRUE ~ CPUE))
+goodcop = filter(Bugs_allfilters, Order %in%c("Cyclopoida","Calanoida")) %>%
+  filter(Genus%in%c("Eurytemora","Pseudodiaptomus","Sinocalanus"))%>%
+  group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
+           Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
+           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+  summarize(CPUE = sum(CPUE, na.rm = T)) %>%
+  left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
+  mutate(Taxon = "NonPredCop", CPUE = case_when(is.na(CPUE) ~ 0,
+                                              TRUE ~ CPUE))
+
+weirdcop = filter(Bugs_allfilters, Genus == "Limnoithona") %>%
+  group_by(SampleID, Longitude, Latitude, Project_na,Region, Type, Source, Date, Station, Microcystis, Chlorophyll,
+           Secchi, Temperature, SalSurf, TurbidityNTU, TowType, Year, Month, BottomDepth, Tide, Datetime, DO, 
+           TurbidityFNU, SizeClass, Lifestage,Volume) %>%
+  summarize(CPUE = sum(CPUE, na.rm = T)) %>%
+  left_join(filter(sample_info, !TowType  %in% c("PVC", "PPG", "Ponar"))) %>% #remove benthic samples
+  mutate(Taxon = "Limnoithona", CPUE = case_when(is.na(CPUE) ~ 0,
+                                              TRUE ~ CPUE))
+
+save(goodcop, file = "data/NonPredatoryCopepods.RData")
+save(badcop, file = "data/PredatoryCopepods.RData")
+save(weirdcop, file = "data/Limnoithona.RData")
+
+write.csv(goodcop, file = "data/NonPredatoryCopepods.csv", row.names = F)
+write.csv(badcop, file = "data/PredatoryCopepods.csv", row.names = F)
+write.csv(weirdcop, file = "data/Limnoithona.csv", row.names = F)
 
 #exploritory plots of each dataset ################################
 load("data/Bivalves.RData")
@@ -405,3 +503,18 @@ ggplot()+
   geom_sf(data = empben_sites)+
   geom_sf(data = PrioritySites, alpha = 0.5)
 
+insectsX = filter(Bugs_allfilters, Class == "Insecta") %>%
+  group_by(Order) %>%
+  summarize(CPUE = sum(CPUE))
+
+ephem = filter(Bugs_allfilters, Order == "Ephemeroptera", CPUE !=0) 
+
+Hemiptera = filter(Bugs_allfilters, Order == "Hemiptera", CPUE !=0) 
+
+Diptera = filter(Bugs_allfilters, Order == "Diptera", CPUE !=0) 
+
+ggplot(Diptera) + aes(x = Region, y = CPUE, fill = Family) + geom_col(position = "fill")
+
+zoops = filter(Bugs_allfilters, SizeClass == "Meso", Class == "Copepoda", !is.na(Genus))
+ggplot(zoops, aes(x = Project_na, y = CPUE, fill = Genus)) + geom_col(position = "fill")+
+  scale_fill_manual(values = c(fishpal, zoopal))

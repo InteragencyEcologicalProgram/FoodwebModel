@@ -136,7 +136,7 @@ ggplot()+
   geom_sf(data = vegshp, alpha = 0.3, fill = "green3")+
   coord_sf(xlim = c(-122.2, -121.2), ylim = c(37.78, 38.7))
 
-#shapefiles from Shruti
+#shapefiles from Shruti ###################################################
 #oh, this is just what I gave here, minus the suisun sites
 extshr = st_read("GIS dta/Exteriors_Delta_UTM/Exteriors_Delta_UTM.shp")
 intshr = st_read("GIS dta/PrioritySites_Delta_UTM/PrioritySites_Delta_UTM.shp")
@@ -147,37 +147,67 @@ ggplot()+
   coord_sf(xlim = c(-122.0, -121.5), ylim = c(38, 38.4))
 
 
-vegarea1 = read_csv("GIS dta/RH_Exteriors_area_m2_2026-07-22.csv") %>%
-  mutate(Type = "Outside")
+vegarea1 = read_csv("Data/RH_Exteriors_area_m2_delta2026-08-19.csv") %>%
+  mutate(Type = "Outside") %>%
+  filter(!is.na(water))
 
-vegarea2 = read_csv("GIS dta/RH_PrioritySites_area_m2_2026-07-22.csv") %>%
-  mutate(Type = "Inside")
+vegarea2 = read_csv("Data/RH_PrioritySites_area_m2_delta2026-08-19.csv") %>%
+  mutate(Type = "Inside") %>%
+  filter(!is.na(water))
 
-vegarea = bind_rows(vegarea1, vegarea2) %>%
-  pivot_longer(cols = c(water, SAV, whyacinth, spongeplant, emergent, NPV, wprimrose, shadow, EMPR, 
-                        alligweed, pennywort, FAV, land, soil, riparian), names_to = "VegType", values_to = "Area")
 
-mypal = c("green3", "yellowgreen", "darkgreen", "orange", "tan", "gold", "seagreen", "lightgreen", 
-          "darkolivegreen", "grey", "goldenrod4", "cyan3", "lightblue", "purple", "yellow")
-ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType)) + geom_area(position = "fill")+
-  facet_grid(Type~proj_name)+ scale_fill_manual(values = mypal)
+vegarea3 = read_csv("Data/RH_Exteriors_area_m2_suisun_2026-08-19.csv") %>%
+  mutate(Type = "Outside") %>%
+  rename(NPV = npv) %>%
+  filter(!is.na(water))
 
-ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType)) + geom_area()+
+
+vegarea4 = read_csv("Data/RH_PrioritySites_area_m2_suisun_2026-08-19.csv") %>%
+  mutate(Type = "Inside")%>%
+  rename(NPV = npv) %>%
+  filter(!is.na(water))
+
+
+vegarea = bind_rows(vegarea1, vegarea2, vegarea3, vegarea4) %>%
+  pivot_longer(cols = c(water, SAV, whyacinth, spongeplant, emergent, NPV, wprimrose, 
+                        shadow, EMPR, tulecat, salicornia,
+                        phragmites, mudflat, alligweed, othermarsh,
+                         pennywort, FAV, land, soil, riparian), names_to = "VegType", values_to = "Area") %>%
+  mutate(VegType2 = case_when(VegType %in% c("phragmites", "tulecat", "emergent") ~ "emergent",
+                              VegType %in% c("spongeplant", "whyacinth", "wprimrose", "pennywort") ~ "FAV",
+                              VegType %in% c("mudflat", "soil") ~ "soil",
+                              TRUE ~ VegType)) %>%
+  filter(!is.na(Area))
+
+ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType2)) + geom_area(position = "fill")+
+  facet_grid(Type~proj_name)
+
+ggplot(vegarea, aes(x = yyyy, y = Area, fill = VegType2)) + geom_area()+
   facet_grid(Type~proj_name)+ scale_fill_manual(values = mypal)+
   geom_hline(aes(yintercept = ttlSRarea))
 
-vegarea_bg = filter(vegarea, VegType %in% c("water", "SAV","land", "emergent", "NPV", "shadow",  
-                                             "FAV", "soil", "riparian"))
+test = filter(vegarea, proj_name == "Browns")
 
-vegpal = c("water" = "lightblue", "FAV" = "green3", "emergent"= "darkgreen", land = "tan",NPV =  "gold", "SAV" = "lightgreen", 
+ggplot(arrange(test, VegType2),
+       aes(x = yyyy, y = Area, fill = VegType2)) + geom_area()+
+  facet_grid(Type~proj_name)+ scale_fill_manual(values = mypal)+
+  geom_hline(aes(yintercept = ttlSRarea))
+
+vegarea_bg = filter(vegarea, VegType2 %in% c("water", "SAV","land", "emergent", "NPV", "shadow",  
+                                             "FAV", "soil", "riparian")) %>%
+  group_by(VegType2, proj_name, yyyy, Type) %>%
+  summarize(Area = sum(Area, na.rm = T), ttlSRarea = max(ttlSRarea))
+
+vegpal = c("water" = "lightblue", "FAV" = "green3", "emergent"= "darkgreen", 
+           land = "tan",NPV =  "gold", "SAV" = "lightgreen", 
                    "riparian" =  "darkolivegreen","shadow"= "grey","soil"= "goldenrod4")
 
 
-ggplot(vegarea_bg, aes(x = yyyy, y = Area, fill = VegType)) + geom_area()+
+ggplot(vegarea_bg, aes(x = yyyy, y = Area, fill = VegType2)) + geom_area()+
   facet_grid(Type~proj_name)+ scale_fill_manual(values = vegpal)+
   geom_point(aes(y = ttlSRarea))
 
-ggplot(vegarea_bg, aes(x = yyyy, y = Area, fill = VegType)) + geom_area(position = "fill")+
+ggplot(vegarea_bg, aes(x = yyyy, y = Area, fill = VegType2)) + geom_area(position = "fill")+
   facet_grid(Type~proj_name)+ scale_fill_manual(values = vegpal)
 
 test = vegarea_bg  %>%

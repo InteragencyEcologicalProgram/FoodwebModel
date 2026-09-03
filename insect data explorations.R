@@ -95,11 +95,12 @@ sample_meta <- Bugs_allfilters %>%
   distinct(SampleID, .keep_all = TRUE) %>%
   select(SampleID, Project_na, Type, Region, Source, Date, Year, Month,
          Station, TowType, Habitat, Longitude, Latitude,
-         Secchi, Temperature, Chlorophyll, SalSurf, SalBott, TurbidityNTU)  # need other env data?``
+         Secchi, Temperature, Chlorophyll, SalSurf, SalBott, TurbidityNTU)
 # wind up 7,733 unique SampleIDs
 
 # insects come in different life stages...we're going to recode into 3: larva, adult, undifferentiated
-Bugs_allfilters %>%
+Bugs_allfilters <-
+  Bugs_allfilters %>%
   filter(Class == "Insecta") %>%
   mutate(Lifestage_simple = case_when(
     Lifestage %in% c("Larva", "Pupa", "Juvenile") ~ "Larva",
@@ -111,7 +112,10 @@ Bugs_allfilters %>%
 # taxonomy lookup — one row per Taxname
 taxonomy_lookup <- Bugs_allfilters %>%
   filter(Class == "Insecta") %>%
-  distinct(Taxname, Order, Family, Genus, Species)
+  distinct(Order, Family, Genus, Species, Taxname) |> 
+  arrange(Order, Family, Genus)
+
+taxonomy_lookup |> group_by(Order, Family) |> summarise(n = n()) |> print(n = 99)
 
 ## CPUE ----
 # sum CPUE across lifestages, complete the grid
@@ -172,7 +176,7 @@ diversity_long <- insect_wide %>%
 taxonomy_lookup %>% 
   count(Taxname) %>% 
   filter(n > 1)
-# nope!
+# nope! (that's good)
 
 ## site diversity -----
 ggplot(diversity_long, aes(x = reorder(Project_na, value, median), y = value)) +
@@ -266,7 +270,8 @@ method_summary %>%
 
 good_methods <- method_summary %>%
   filter(prop_zero < 0.75) %>%    
-  select(Source, TowType)
+  select(Source, TowType) |> 
+  print()
 
 Bugs_filtered <- Bugs_allfilters %>%
   semi_join(good_methods, by = c("Source", "TowType"))
@@ -315,7 +320,9 @@ family_diversity_filtered <- family_cpue_filtered %>%
     simpson = {p <- CPUE[CPUE > 0] / sum(CPUE[CPUE > 0]); 1 - sum(p^2)},
     .groups = "drop"
   ) %>%
-  mutate(across(c(shannon, simpson), ~ if_else(total_CPUE == 0, NA_real_, .)))
+  mutate(across(c(shannon, simpson), 
+                ~ if_else(total_CPUE == 0, NA_real_, .))) |> 
+  print()
 
 ## pivot wide ------
 # wide format with metadata, diversity, and season
@@ -661,13 +668,17 @@ nmds_scores %>%
   select(SampleID, Project_na, Source, TowType, NMDS1, NMDS2)
 # both from Decker, FRP, Surface
 
-# 2. which families have extreme scores on each axis?
-species_scores <- as_tibble(scores(nmds, display = "species"), rownames = "Family") %>%
-  arrange(desc(abs(NMDS1)))
+nmds_scores %>%
+  filter(NMDS1 > 1 | NMDS2 > 0.05) %>%
+  select(SampleID, Project_na, Source, TowType, NMDS1, NMDS2)
 
-species_scores %>% slice_max(abs(NMDS1), n = 10)
-species_scores %>% slice_max(abs(NMDS2), n = 10)
-# Notonectidae & Noteridae stand out
+# 2. which families have extreme scores on each axis?
+species_scores <- as_tibble(wascores(nmds$points, comm_matrix), rownames = "Family") |> 
+  arrange(desc(abs(MDS1))) |> print()
+
+species_scores %>% slice_max(abs(MDS1), n = 10)
+species_scores %>% slice_max(abs(MDS2), n = 10)
+# Notonectidae & Veliidae stand out
 
 # 3. look at the actual CPUE values for the outlier samples
 outlier_ids <- nmds_scores %>%
@@ -686,10 +697,10 @@ family_nonzero %>%
 
 # Why didn't Noteridae show up?
 # for the NMDS1 outlier — top families by NMDS1
-species_scores %>% slice_max(abs(NMDS1), n = 10) %>% pull(Family)
+species_scores %>% slice_max(abs(MDS1), n = 10) %>% pull(Family)
 
 # for the NMDS2 outlier — top families by NMDS2
-species_scores %>% slice_max(abs(NMDS2), n = 10) %>% pull(Family)
+species_scores %>% slice_max(abs(MDS2), n = 10) %>% pull(Family)
 
 # which samples contain Noteridae?
 family_nonzero %>%
@@ -711,13 +722,13 @@ comm_matrix <- family_nonzero %>%
 
 ## rerun NMDS -----
 set.seed(123)
-nmds <- metaMDS(comm_matrix, distance = "bray", k = 2, trymax = 100)
-nmds$stress
-# stress to0 high for 2D, so
+nmds2 <- metaMDS(comm_matrix, distance = "bray", k = 2, trymax = 100)
+nmds2$stress
+# stress too high for 2D, so
 
 set.seed(123)
 nmds3 <- metaMDS(comm_matrix, distance = "bray", k = 3, trymax = 100)
-nmds3$stress
+nmds3$stress # <0.20 is acceptable but interpret w caution
 
 # extract scores & plot
 nmds_scores <- as_tibble(scores(nmds3, display = "sites")) %>%
@@ -772,10 +783,10 @@ permanova_results <-
   adonis2(comm_matrix ~ Type + Region + Season, 
         data = family_nonzero, 
         permutations = 999, 
-        method = "bray")
+        method = "bray") |> print()
 # statistically significant but ecologically weak: type, region & season only 
 # explain about 4% of the variance
-# F=6.3855, p=0.001; centroids are more different than you'd expect by chance
+# F=6.2628, p=0.001; centroids are more different than you'd expect by chance
 # but w n=1206 samples, tiny effects may be statistically significant
 
 # which factor(s) is driving the effect?
@@ -824,7 +835,7 @@ summary(fit_richness) # Rhat should be <1.01 for all parameters
 plot(fit_richness) # trace plots should look like "fuzzy caterpillars"
 pp_check(fit_richness) # posterior predictive check
 
-fit_richness <- brm(
+fit_richness2 <- brm(
   richness ~ Type + Region + Season + method + (1 | Project_na),
   data    = family_nonzero,
   family  = negbinomial(),
@@ -837,9 +848,9 @@ fit_richness <- brm(
   control = list(adapt_delta = 0.95) # bc divergent transitions
 )
 
-summary(fit_richness)
-plot(fit_richness)
-pp_check(fit_richness)
+summary(fit_richness2)
+plot(fit_richness2)
+pp_check(fit_richness2)
 
 # Shannon models -----
 # swap the family from negbinomial() to Gamma(link = "log") — appropriate for 

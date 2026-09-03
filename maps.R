@@ -221,3 +221,15 @@ ggplot(test, aes(x = yyyy, y =tot, fill = VegType)) + geom_area(position = "fill
 ggplot(test, aes(x = yyyy, y =tot, fill = VegType)) + geom_area()+ 
   scale_fill_manual(values = vegpal) +
   facet_wrap(~VegType, scales = "free_y")
+
+#Summary by region
+
+vegarea_mean = mutate(vegarea_bg, Region = case_when(proj_name %in% c("Browns", "Chipps", "Winter") ~ "Confluence",
+                                                     proj_name %in% c("Ryer", "Tule Red") ~ "Grizzly Bay",
+                                                     proj_name %in% c("Liberty", "LHT", "LCIB", "Flyway Farms") ~ "Cache Slough",
+                                                     TRUE ~ "Decker/Webb")) %>%
+  group_by(Type, VegType2, Region) %>%
+  summarize(Area = mean(Area))
+
+ggplot(vegarea_mean, aes(x = Region, y = Area, fill = VegType2)) + geom_col(position = "fill") +
+  facet_wrap(~Type)+ scale_fill_manual(values = vegpal) 

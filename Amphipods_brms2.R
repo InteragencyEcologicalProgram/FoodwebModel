@@ -1001,3 +1001,143 @@ loo(m_gam14_springA1, m_gam14_springB1, m_gam14_springC1, m_gam14_springD1, m_ga
 # m_gam14_springF1 -360.9      26.3   Region
 
 #I still need to estimate biomass. 
+
+summary(m_gam14_spring1)
+plot(m_gam14_spring1)
+mcmc_plot(m_gam14_spring1)
+plot(conditional_effects(m_gam14_spring1),theme=theme_bw())
+pp_check(m_gam14_spring1, type = "loo_pit_overlay")
+
+
+####Corophiids #######################################################################
+
+
+m_cor14_springA1 <- brm(formula =  bf(CPUE ~ Type+Region+Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+mcor14_springB1 <- brm(formula =  bf(CPUE ~ Region+Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+m_cor14_springC1 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+m_cor14_springD1 <- brm(formula =  bf(CPUE ~ Type+Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1+Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+
+
+m_cor14_springE1 <- brm(formula =  bf(CPUE ~Habitat+
+                                        (1|Source)+
+                                        (1|Year) + (1|Project_na),
+                                      hu ~ 1+Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+m_cor14_springF1 <- brm(formula =  bf(CPUE ~Region+
+                                        (1|Source)+(1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+
+m_cor14_spring1 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
+                                       (1|Source)+ (1|Project_na)+
+                                       (1|Year),
+                                     hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                       data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                       family=hurdle_lognormal(),
+                       warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                       control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+m_cor14_springG1 <- brm(formula =  bf(CPUE ~ Type+Region*Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+m_cor14_springH1 <- brm(formula =  bf(CPUE ~Region*Habitat+
+                                        (1|Source)+ (1|Project_na)+
+                                        (1|Year),
+                                      hu ~ 1 + Habitat), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                        data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                        family=hurdle_lognormal(),
+                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+m_cor14_spring_null <- brm(formula =  bf(CPUE ~ 1+
+                                           (1|Source)+ (1|Project_na)+
+                                           (1|Year),
+                                         hu ~ 1), #this is the hurdle or zero-inflation component. It's currently just the intercept, could add other predictors
+                           data=filter(corph_data, Season == "Spring", Habitat != "Benthic"),
+                           family=hurdle_lognormal(),
+                           warmup=1000,iter=3000,chains=3,cores=15,thin=10,
+                           control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
+
+
+
+loo(m_cor14_springA1, mcor14_springB1, m_cor14_springC1, m_cor14_springD1, m_cor14_springE1, 
+    m_cor14_springF1, m_cor14_spring1,
+    m_cor14_springH1,m_cor14_springG1,m_cor14_spring_null , moment_match = TRUE)
+
+# Model comparisons:
+#   elpd_diff se_diff
+# m_cor14_springA1       0.0       0.0 Type+Region+Habitat, hu ~ Habitat
+# m_cor14_springD1       0.0       0.6 Type+Habitat, hu ~ Habitat
+# m_cor14_spring1       -0.8       3.3 Type*Region+Habitat, hu ~ Habitat
+# m_cor14_springE1      -7.8       4.2 Habitat, hu ~ Habitat
+# mcor14_springB1       -9.1       4.1 Region+Habitat, hu ~ Habitat
+# m_cor14_springG1     -10.3       3.0 Type+Region*Habitat,  hu ~ Habitat
+# m_cor14_springH1     -16.2       5.1 Region*Habitat,  hu ~ Habitat
+# m_cor14_springC1     -17.8       7.4 Type*Region+Habitat, hu ~1
+# m_cor14_spring_null -204.2      22.1 Random effects, hu ~1
+# m_cor14_springF1    -205.6      22.2  Region, hu ~1
+
+summary(m_cor14_springD1)
+plot(m_cor14_springD1)
+mcmc_plot(m_cor14_springD1)
+plot(conditional_effects(m_cor14_springD1),theme=theme_bw())
+pp_check(m_cor14_springD1, type = "loo_pit_overlay")
+
+save(m_cor14_springA1, mcor14_springB1, m_cor14_springC1, m_cor14_springD1, m_cor14_springE1, 
+     m_cor14_springF1, m_cor14_spring1,
+     m_cor14_springH1,m_cor14_springG1,m_cor14_spring_null, m_gam14_springA1, m_gam14_springB1, m_gam14_springC1, m_gam14_springD1, m_gam14_springE1, m_gam14_springF1, m_gam14_spring1,
+     m_gam14_springH1,m_gam14_springG1,m_gam14_spring_null, file = "outputs/AmphModelsFinal.RData")

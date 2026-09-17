@@ -50,8 +50,8 @@ buff_2k1 = st_difference(priority_buff_2k, PrioritySites) %>%
 ggplot()+
   geom_sf(data = WW_Delta)+
   geom_sf(data = buff_2k1, aes(fill = Region))+
-#  geom_sf(data = PrioritySites)+
-  coord_sf(xlim = c(-122.88, -121.82), ylim = c(38.02, 38.4))
+  geom_sf(data = PrioritySites, fill = "yellowgreen")+
+  coord_sf(xlim = c(-122.2, -121.52), ylim = c(38.02, 38.4))
 
 
 ggplot()+
@@ -59,6 +59,18 @@ ggplot()+
   #geom_sf(data = buff_2k1, aes(fill = Region), alpha = 0.5)+
   geom_sf(data = PrioritySites, aes(fill = Region))+
   coord_sf(xlim = c(-122.1, -121.6), ylim = c(38.0, 38.4))
+
+
+#map used in BDSC talk
+library(ggspatial)
+ggplot()+
+  geom_sf(data = WW_Delta, fill = "azure2")+
+  geom_sf(data = buff_2k1, aes(), fill = "lightblue")+
+  geom_sf(data = PrioritySites, fill = "yellowgreen")+
+  coord_sf(xlim = c(-122.1, -121.54), ylim = c(38.02, 38.37))+
+  theme_bw()+
+  annotation_north_arrow(location = "tl", height = unit(1, "cm"), width = unit(1, "cm"))+
+  annotation_scale()
 
 #I think i need a lHT that isn't just the water. Also veteteated plain###############
 
@@ -233,3 +245,24 @@ vegarea_mean = mutate(vegarea_bg, Region = case_when(proj_name %in% c("Browns", 
 
 ggplot(vegarea_mean, aes(x = Region, y = Area, fill = VegType2)) + geom_col(position = "fill") +
   facet_wrap(~Type)+ scale_fill_manual(values = vegpal) 
+
+#get rid of shadow, lump NPV with EAV
+vegarea_mean2 = mutate(vegarea_bg, Region = case_when(proj_name %in% c("Browns", "Chipps", "Winter") ~ "Confluence",
+                                                      proj_name %in% c("Ryer", "Tule Red") ~ "Grizzly Bay",
+                                                      proj_name %in% c("Liberty", "LHT", "LCIB", "Flyway Farms") ~ "Cache Slough",
+                                                      TRUE ~ "Decker/Webb"),
+                       VegType2  = replace_values(VegType2, "NPV" ~ "emergent")) %>%
+  filter(VegType2 != "shadow", VegType2 != "land") %>%
+  group_by(Type, VegType2, Region, proj_name, yyyy) %>%
+  summarize(Area = sum(Area))%>%
+  group_by(Type, VegType2, Region) %>%
+  summarize(Area = mean(Area))
+
+
+
+vegarea_mean2 = vegarea_mean2 %>%
+  group_by(Region, Type) %>%
+  mutate(Total = sum(Area), PercentVeg = Area/Total) %>%
+  ungroup()
+
+save(vegarea_mean2, file = "outputs/VegAreaByRegion.RData")

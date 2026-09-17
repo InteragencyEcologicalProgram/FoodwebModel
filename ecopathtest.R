@@ -3,6 +3,7 @@
 library(Rpath) # we should use this for this effort
 library(tidyverse)
 library(data.table)
+library(readxl)
 #library(ecostate) #this might work better for time series dat ain the future. 
 
 #what we need
@@ -53,52 +54,249 @@ library(data.table)
 #ask for each people is going to be getting biomass first. 1. functional groups within our taxa. 
 
 #2. biomass per volume/area or data needed to get there. - Rosie to describe. 
-library(readxl)
 
+#first work on biomass predicitons
+#predatory copepods
+bcop = readRDS("outputs/zoop/bcop_hu_predictions.rds")
+#non-predatory copepods
+gcop = readRDS("outputs/gcop_hu_predictions.rds")
+#limnoithona
+wcop = readRDS("outputs/wcop_hu_predictions.rds")
+#cladocera
+clad = readRDS("outputs/clad_hu_predictions.rds")
+
+#zooplankton model plots
+gcopmod = read_rds("outputs/gcop_base_hu_brmsfit.rds")
+wcopmod = read_rds("outputs/wcop_base_hu_limno_brmsfit.rds")
+cladmod = read_rds("outputs/zoop/clad_base_hu_brmsfit.rds")
+bcopmod = read_rds("outputs/zoop/bcop_reg_only_hu_brmsfit.rds")
+
+plot(conditional_effects(gcopmod), theme = theme_bw())
+bayes_R2(gcopmod)
+plot(conditional_effects(wcopmod), theme = theme_bw())
+bayes_R2(wcopmod)
+plot(conditional_effects(bcopmod), theme = theme_bw())
+plot(conditional_effects(cladmod), theme = theme_bw())
+
+#average by region. Turn into biomass
+#biomass is anywhere from 3 for Acanthocyclops to 15 for an andult tortaus. I'll start with 7 ug carbon weight.
+#This is biomass per cubic meter. Need to multiply by depth, deeper outside wetlands than inside.
+#also convert to wet weight - 7/.4 * 10
+bcopmean = group_by(bcop, Region) %>%
+  summarise(Mean = mean(pred), sd = sd(pred), 
+            meanbiomass = Mean*7/1000000/.4*10) %>% #wet weight in g. per cubic meter
+mutate(Group = "PredatoryCopepods", Habitat = "Open Water") %>%
+  merge(data.frame(Type = c("Inside", "Outside")))
+
+#non predatory copepods are 2-3 ugC for adults.
+gcopmean = group_by(gcop, Region, Type) %>%
+  summarise(Mean = mean(pred), sd = sd(pred), 
+            meanbiomass = Mean*2/1000000/.4*10) %>%
+  mutate(Group = "OtherCopepods", Habitat = "Open Water")
+
+#Limniothona are 0.13
+wcopmean = group_by(wcop, Region,Type) %>%
+  summarise(Mean = mean(pred), sd = sd(pred), 
+            meanbiomass = Mean*.13/1000000/.4*10) %>%
+  mutate(Group = "Limnoithona", Habitat = "Open Water")
+
+#cladocera are pretty variable, Daphnia are big (4ug), bosmina are small (0.6 ug)
+#I'll split the difference for now
+cladmean = group_by(clad, Region, Type) %>%
+  summarise(Mean = mean(pred), sd = sd(pred), 
+            meanbiomass = Mean*2/1000000/.4*10) %>%
+  mutate(Group = "Cladocera", Habitat = "Open Water")
+
+
+#amphipod data
+load("outputs/amph_predictions.RData")
+
+#gamarids
+#from FRP data, geometric mean biomass per gammarid in March was 9.642778e-04
+#and i think that's wet weight
+#I need to doublecheck wehhter that i grams or mg
+gammean = group_by(gamarid_predictions, Region, Habitat, Type) %>%
+  summarise(Mean = mean(Estimate), 
+            meanbiomass = Mean*0.000964) %>%
+  mutate(Group = "Gammarids")
+
+#1.020357e-03
+cormean = group_by(corph_predictions, Region, Habitat, Type) %>%
+  summarise(Mean = mean(Estimate), 
+            meanbiomass = Mean*0.0010203) %>%
+  mutate(Group = "Corophiids")
+
+#clams - Kristi gave me the models I need to generate predictions
+corbmodel = readRDS("Corb_lognorm_h_58.rds")
+potmodel = readRDS("Potamo_lognorm_h_61.rds")
+
+summary(corbmodel)
+summary(potmodel)
+biv_data_sp <- readRDS(here("Data/d_Bivalves_wide_X2_spc_sp.rds"))
+
+#oh, conductivity and X2 have been centered so I can just use 0 for the mean!
+load("outputs/bivalve_predictions.RData")
+
+corpred = group_by(corbic_predictions, Region) %>%
+  summarise(meanbiomass = mean(Estimate)) %>%
+  mutate(Group = "Corbicula", Habitat = "Open Water") %>%
+  merge(data.frame(Type = c("Inside", "Outside")))
+
+potpred = group_by(potam_predictions, Region, Type) %>%
+  summarise(meanbiomass = mean(Estimate)) %>%
+  mutate(Group = "Potamocorbula", Habitat = "Open Water")
+
+#don't have insects yet, placeholder
+insects = read_excel("MattsRpath/RPath_parameterdraftlist.xlsx", sheet = "InsectPlaceholder", na = "NA")
+
+
+#all biomasses
+biomasses = bind_rows(cormean, gammean, cladmean, gcopmean, wcopmean, bcopmean, corpred, potpred)
+
+write.csv(biomasses, file = "outputs/biomass_predictions.csv")
+
+biomassesA = biomasses %>%
+  mutate(Region = case_when(Region %in% c("Decker", "Web Tract Berms") ~ "Decker/Webb",
+                            TRUE ~ Region)) %>%
+  group_by(Region, Habitat, Type, Group) %>%
+  summarize(meanbiomass = mean(meanbiomass, na.rm = T))
+
+#now biomass per hectare
+
+load("outputs/VegAreaByRegion.RData")
+#what percentage of each region is in each habitat?
+
+vegarea_mean2 = vegarea_mean2 %>%
+  mutate(Habitat = recode_values(VegType2,
+                                 "emergent" ~ "EAV",
+                                 "FAV" ~ "FAV",
+                                 "water" ~ "Open Water",
+                                 "SAV" ~ "SAV",
+                                 default = "Other"  ))
+
+
+ggplot(vegarea_mean2, aes(x = Region, y = PercentVeg, fill = Habitat)) +
+  geom_col() + facet_wrap(~Type)
+
+ggplot(vegarea_mean2, aes(x = Region, y = PercentVeg, fill = VegType2)) +
+  geom_col() + facet_wrap(~Type)
+
+#convert to biomass per hectare
+biomasses_habitat = left_join(biomassesA, vegarea_mean2) %>%
+  mutate(kg_per_ha = case_when(Habitat %in% c("EAV", "SAV", "FAV") ~ meanbiomass*10*PercentVeg, #assume vegetated habitats area all about 1mdeep, multiply by 10 to convert to wet weith
+                               Habitat == c("Open Water") & Type == "Outside" & !Group %in% c("Potamocorbula", "Corbicula") ~ meanbiomass*10*PercentVeg*5, #still need depth values. Sigh. Assume it's 5 m deep outside, 1 m deep insiode
+                               Habitat == c("Open Water") & Type == "Inside" & !Group %in% c("Potamocorbula", "Corbicula") ~ meanbiomass*10*PercentVeg*1,
+                               Habitat == c("Open Water") & Type == "Outside" & !Group %in% c("Potamocorbula", "Corbicula") ~ meanbiomass*10*PercentVeg*5,
+                               Habitat == c("Open Water") & Group %in% c("Potamocorbula", "Corbicula") ~ meanbiomass*PercentVeg*10,
+                               TRUE ~ 0))
+
+#biomass per hectare for the vegtation and phytoplankton.
+#ugh, phyplankton
+
+PPs = read_excel("MattsRpath/RPath_parameterdraftlist.xlsx", sheet = "primary producers", na = "NA") %>%
+ right_join(vegarea_mean2)%>%
+  mutate(kg_per_ha = Biomass*PercentVeg)
+
+#detritus and fishing
+
+detfish = data.frame(Group = c("Detritus", "Fishing")) %>%
+  merge(data.frame(InsideOutside = c("Inside", "Outside"))) %>%
+  merge(data.frame(Region = unique(biomasses_habitat$Region)))
+
+Allbiomass = bind_rows(biomasses_habitat, PPs) %>%
+  select(Region, Habitat, Type, Group, kg_per_ha) %>%
+  rename(Biomass = kg_per_ha, InsideOutside = Type) %>%
+  group_by(Region, InsideOutside, Group) %>%
+  summarise(Biomass = sum(Biomass, na.rm =T)) %>%
+  filter(!is.na(Group)) %>%
+  bind_rows(insects) %>%
+  bind_rows(detfish) %>%
+  mutate(Scenario = paste(Region, InsideOutside))
+
+
+
+#load other parameters besides biomass
 pathModel = read_excel("MattsRpath/RPath_parameterdraftlist.xlsx", sheet = "testparams", na = "NA") %>%
-  filter(!is.na(Group))
+  filter(!is.na(Group)) %>%
+  select(-Biomass) %>%
+  left_join(Allbiomass)
+
+
+
 diets = read_excel("MattsRpath/RPath_parameterdraftlist.xlsx", sheet = "dietmatrix", na = "NA")
 
+#set up Rpath for each scenario
+source("checkRpath.R")
 
-Rosiepath <- create.rpath.params(group = pathModel$`Group`,
-                                        type = pathModel$Type, stgroup = NA)
+rpathcreation = function(ScenarioX, Data){
+  pathmodel = filter(Data, Scenario == ScenarioX)
+  Rosiepath <- create.rpath.params(group = pathmodel$`Group`,
+                                        type = pathmodel$Type, stgroup = NA)
 
-
-Rosiepath$model[, Biomass := pathModel$Biomass]
-
-Rosiepath$model[,Detritus := pathModel$Detritus]
-
+Rosiepath$model[, Biomass := pathmodel$Biomass]
+Rosiepath$model[,Detritus := pathmodel$Detritus]
 Rosiepath$model[, Fishing := 0]
 Rosiepath$model[, Fishing.disc := 0]
-Rosiepath$model[, PB := pathModel$PB]
-Rosiepath$model[, QB := pathModel$QB_calc]
-Rosiepath$model[, Unassim  := pathModel$Unassim ]
-Rosiepath$model[, BioAcc  := pathModel$BioAcc ]
-
+Rosiepath$model[, PB := pathmodel$PB]
+Rosiepath$model[, QB := pathmodel$QB_calc]
+Rosiepath$model[, Unassim  := pathmodel$Unassim ]
+Rosiepath$model[, BioAcc  := pathmodel$BioAcc ]
 Rosiepath$diet = as.data.table(diets)
 
-# Check parameters
-#check.rpath.params(Rosiepath)
-source("checkRpath.R")
 check.rpath2(Rosiepath)
 Rosiepath_testrun <- rpath(Rosiepath, eco.name = 'test ecosystem')
 
-Rosiepath_testrun
+return(Rosiepath_testrun)
 
-print(Rosiepath_testrun, morts = F)
-print(Rosiepath_testrun, morts = T, skip_absent = T)
-
-
-summary(Rosiepath_testrun)
-Rosiepath_testrun$TL #trophic level
-Rosiepath_testrun$Unassim #
-Rosiepath_testrun$DetFate
-
-webplot(Rosiepath_testrun)
-webplot(Rosiepath_testrun,eco.name="Test",labels = T)
+}
 
 
+# Check parameters
+#check.rpath.params(Rosiepath)
 
+CacheInside = rpathcreation("Cache Slough Inside", pathModel)
+
+print(CacheInside, morts = F)
+
+
+summary(CacheInside)
+CacheInside$TL #trophic level
+CacheInside$Unassim #
+CacheInside_plot =bind_cols(Group = CacheInside$Group, Biomass = CacheInside$Biomass, TL = CacheInside$TL)
+CacheInside_plot2 = summarize.for.webplot(CacheInside)
+
+Rosiewebplot = function(Rpathob, Scenario) {
+
+  plotob = summarize.for.webplot(Rpathob)
+p <- ggplot() + geom_segment(aes(x = pred.x, y = pred.y, 
+                                 xend = prey.x, yend = prey.y), color = "grey",  
+                             data = plotob$connections) + labs(x = "", y = "Trophic position") + 
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())+
+  geom_point(aes(x = x.pos, y = TL, size = log(Biomass), color = log(Biomass)),  data = plotob$pointmap)+
+  scale_size(range = c(0.5, 20), breaks = c(-5,0,5,10,15))+
+  ggrepel::geom_text_repel(aes(x = x.pos, y = TL, label = Group),  
+            data = plotob$pointmap, color = "black")+
+  theme_bw()+
+  scale_color_viridis_c()+ggtitle(Scenario)
+p  }
+
+Rosiewebplot(CacheInside, "Cache Slough Wetland")
+
+CacheOutside = rpathcreation("Cache Slough Outside", pathModel)
+print(CacheOutside)
+Rosiewebplot(CacheOutside, "Cache Slough Open Water")
+
+
+GrizzlyOutside = rpathcreation("Grizzly Bay Outside", pathModel)
+print(GrizzlyOutside)
+Rosiewebplot(GrizzlyOutside, "Grizzly Bay Open Water")
+
+GrizzlyInside = rpathcreation("Grizzly Bay Inside", pathModel)
+print(GrizzlyInside)
+Rosiewebplot(GrizzlyInside, "Grizzly Bay Wetland")
+
+
+# simulation stuff - for later ###########################
 # Create a 50 yr Rsim scenario
 Rsim.scenario <- rsim.scenario(Rosiepath_testrun, Rosiepath, years = 1:50)
 # Run the Rsim simulation

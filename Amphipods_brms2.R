@@ -457,13 +457,16 @@ corph_data <- Amphipoda%>%
                             Month %in% c(12,1,2) ~ "Winter"),
          Season = factor(Season, levels = c("Spring", "Summer", "Fall", "Winter")),
          yr_mo=paste(Year,Month,sep="_"),
+         Habitat = case_when(Habitat == "Surface" ~ "Open Water",
+                             TRUE ~ Habitat),
          wetland_na_yr_mo=paste(Project_na,Year,Month,sep="_"),
          wetland_yr_sea=paste(Project_na,Year,Season,sep="_"),
          
          Reagion_yr_sea=paste(Region,Year,Season,sep="_"),
          wetland_yr=paste(Project_na,Year, sep="_"),
          logCPUE = log(CPUE+1)) %>%
-  ungroup()
+  ungroup() %>%
+  filter(Habitat != "Benthic")
 
 
 
@@ -1141,3 +1144,25 @@ save(m_cor14_springA1, mcor14_springB1, m_cor14_springC1, m_cor14_springD1, m_co
      m_cor14_springF1, m_cor14_spring1,
      m_cor14_springH1,m_cor14_springG1,m_cor14_spring_null, m_gam14_springA1, m_gam14_springB1, m_gam14_springC1, m_gam14_springD1, m_gam14_springE1, m_gam14_springF1, m_gam14_spring1,
      m_gam14_springH1,m_gam14_springG1,m_gam14_spring_null, file = "outputs/AmphModelsFinal.RData")
+
+
+#predictions from teh best model ##########################################
+
+#dataset to predict on 
+
+Newdata = unique(gamarid_data%>%
+                          select(Type,Project_na, Region))  %>%
+  merge(data.frame(Habitat = c("Open Water", "EAV", "SAV", "FAV"))) %>%
+  merge(data.frame(Year = unique(gamarid_data$Year))) %>%
+  merge(data.frame(Source = unique(gamarid_data$Source))) %>%
+  filter(!Source %in% c("USGSbenthic", "STN", "FMWT"))
+
+gamarid_predictions = predict(m_gam14_spring1, newdata = Newdata)  %>%
+  bind_cols(Newdata)
+
+plot(conditional_effects(m_gam14_spring1),theme=theme_bw())
+
+corph_predictions = predict(m_cor14_springD1, newdata = Newdata)  %>%
+  bind_cols(Newdata)
+
+save(gamarid_predictions, corph_predictions, file = "outputs/amph_predictions.RData")

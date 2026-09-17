@@ -53,4 +53,4 @@ ggplot(amphbiomass_long, aes(x = Month, y = Value, fill = SummaryType)) + geom_c
   facet_grid(Metric~AmphGroup, scales = "free_y") +
   geom_label(aes(y = 0, label = N, x = Month), inherit.aes = F)
 
-ggplot(amphbiomasssum, aes(x = length)) + geom_histogram()
+

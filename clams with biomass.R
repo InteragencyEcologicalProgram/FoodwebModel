@@ -11,14 +11,17 @@ load("data/wetlandsites.RData")
 load("data/PrioritySites.RData")
 
 wetlandclams = wetlandclams%>%
-  mutate(SampleID = paste(Source, Date, Latitude),
+  mutate(SampleID = paste(Source, Date,Month, Year, Latitude),
          Longitude = case_when(Longitude > 1 ~ Longitude*-1,
                                TRUE ~ Longitude))
 
-clamsites = select(wetlandclams, Source, Date, Latitude, Longitude) %>%
-  mutate(SampleID = paste(Source, Date, Latitude)) %>%
+clamsites = select(wetlandclams, Source, Date,Month, Year, Latitude, Longitude) %>%
+  mutate(SampleID = paste(Source, Date,Month, Year, Latitude)) %>%
   distinct() %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove =F)
+
+
+allsites_buff_2k = st_buffer(allsites, 2000)
 
 ggplot(WW_Delta)+
   geom_sf()+
@@ -40,7 +43,6 @@ inside_clams = clamsites  %>%
 
 #allsites_buff_100m = st_buffer(allsites, 100)
 
-allsites_buff_2k = st_buffer(allsites, 2000)
 # 
 # samples_100m = samples %>%
 #   st_transform(crs = st_crs(allsites)) %>%
@@ -97,12 +99,13 @@ outside_clamsamples2 = outside_clamsamples  %>%
   left_join(outdistances)
 
 
+
 #put them all together
 
 clams_spatialfilters = bind_rows(inside_clams, outside_clamsamples2) %>%
   select(-site_type, -Source) %>%
   distinct() %>%
-  left_join(select(wetlandclams,-Longitude, -Latitude, -Date), by = "SampleID") %>%
+  left_join(select(wetlandclams,-Longitude, -Latitude, -Date, -Year, -Month), by = "SampleID") %>%
   filter(Project_na %in% PrioritySites$Project_na)
 
 table(clams_spatialfilters$Project_na, clams_spatialfilters$Type)
@@ -130,3 +133,4 @@ save(clams_allfilters, file = "data/clams_withbiomass.RData")
 ggplot(clams_allfilters, aes(x = Project_na, y = Biomass, fill = Species)) + geom_boxplot() +
   facet_wrap(~Type)
 
+#

@@ -1,0 +1,125 @@
+"","Region","Habitat","Type","Mean","meanbiomass","Group","sd"
+"1","Cache Slough","EAV","Inside",3.56069048668383,0.00363297250356351,"Corophiids",NA
+"2","Cache Slough","EAV","Outside",1.71114687631729,0.00174588315790653,"Corophiids",NA
+"3","Cache Slough","FAV","Inside",13.4408245973475,0.0137136733366736,"Corophiids",NA
+"4","Cache Slough","FAV","Outside",5.90999766379594,0.006029970616371,"Corophiids",NA
+"5","Cache Slough","Open Water","Inside",0.240657307176855,0.000245542650512545,"Corophiids",NA
+"6","Cache Slough","Open Water","Outside",0.10760333112689,0.000109787678748765,"Corophiids",NA
+"7","Cache Slough","SAV","Inside",83.6400555612566,0.0853379486891501,"Corophiids",NA
+"8","Cache Slough","SAV","Outside",38.7584916687169,0.0395452890495918,"Corophiids",NA
+"9","Confluence","EAV","Inside",4.18385808645189,0.00426879040560686,"Corophiids",NA
+"10","Confluence","EAV","Outside",1.91039238104255,0.00194917334637772,"Corophiids",NA
+"11","Confluence","FAV","Inside",15.0680331356857,0.0153739142083401,"Corophiids",NA
+"12","Confluence","FAV","Outside",6.98067835315905,0.00712238612372818,"Corophiids",NA
+"13","Confluence","Open Water","Inside",0.255458646841473,0.000260644457372354,"Corophiids",NA
+"14","Confluence","Open Water","Outside",0.124240577451959,0.000126762661174234,"Corophiids",NA
+"15","Confluence","SAV","Inside",96.1247792627699,0.0980761122818041,"Corophiids",NA
+"16","Confluence","SAV","Outside",43.3130220612323,0.0441922764090753,"Corophiids",NA
+"17","Decker","EAV","Inside",3.67398692047329,0.00374856885495889,"Corophiids",NA
+"18","Decker","EAV","Outside",1.66484213994234,0.00169863843538317,"Corophiids",NA
+"19","Decker","FAV","Inside",13.7155783113331,0.0139940045510532,"Corophiids",NA
+"20","Decker","FAV","Outside",6.17289857817519,0.00629820841931214,"Corophiids",NA
+"21","Decker","Open Water","Inside",0.26728217502832,0.000272708003181395,"Corophiids",NA
+"22","Decker","Open Water","Outside",0.113508150726315,0.000115812366186059,"Corophiids",NA
+"23","Decker","SAV","Inside",85.6654760927402,0.0874044852574228,"Corophiids",NA
+"24","Decker","SAV","Outside",41.2692177792138,0.0421069829001319,"Corophiids",NA
+"25","Grizzly Bay","EAV","Inside",4.14886738749722,0.00423308939546341,"Corophiids",NA
+"26","Grizzly Bay","EAV","Outside",1.8885937040586,0.00192693215625099,"Corophiids",NA
+"27","Grizzly Bay","FAV","Inside",15.6070372813901,0.0159238601382023,"Corophiids",NA
+"28","Grizzly Bay","FAV","Outside",7.16459616925065,0.00731003747148644,"Corophiids",NA
+"29","Grizzly Bay","Open Water","Inside",0.274000911454861,0.000279563129957395,"Corophiids",NA
+"30","Grizzly Bay","Open Water","Outside",0.129175851997428,0.000131798121792976,"Corophiids",NA
+"31","Grizzly Bay","SAV","Inside",88.9746042795038,0.0907807887463777,"Corophiids",NA
+"32","Grizzly Bay","SAV","Outside",45.027317161127,0.0459413716994978,"Corophiids",NA
+"33","Web Tract Berms","EAV","Inside",2.68278618663009,0.00273724674621868,"Corophiids",NA
+"34","Web Tract Berms","EAV","Outside",1.33426462139702,0.00136135019321138,"Corophiids",NA
+"35","Web Tract Berms","FAV","Inside",10.640651275252,0.0108566564961396,"Corophiids",NA
+"36","Web Tract Berms","FAV","Outside",4.71717776311701,0.00481293647170828,"Corophiids",NA
+"37","Web Tract Berms","Open Water","Inside",0.184598786206436,0.000188346141566427,"Corophiids",NA
+"38","Web Tract Berms","Open Water","Outside",0.0888755458431751,9.06797194237915e-05,"Corophiids",NA
+"39","Web Tract Berms","SAV","Inside",63.7660761482475,0.0650605274940569,"Corophiids",NA
+"40","Web Tract Berms","SAV","Outside",30.2532852652751,0.0308674269561601,"Corophiids",NA
+"41","Cache Slough","EAV","Inside",16.9297393332462,0.0163202687172493,"Gammarids",NA
+"42","Cache Slough","EAV","Outside",16.3119698958677,0.0157247389796165,"Gammarids",NA
+"43","Cache Slough","FAV","Inside",177.466269023129,0.171077483338297,"Gammarids",NA
+"44","Cache Slough","FAV","Outside",178.721724624902,0.172287742538406,"Gammarids",NA
+"45","Cache Slough","Open Water","Inside",0.612680471573536,0.000590623974596889,"Gammarids",NA
+"46","Cache Slough","Open Water","Outside",0.598784952853882,0.000577228694551143,"Gammarids",NA
+"47","Cache Slough","SAV","Inside",404.753829569336,0.390182691704839,"Gammarids",NA
+"48","Cache Slough","SAV","Outside",408.181459143975,0.393486926614792,"Gammarids",NA
+"49","Confluence","EAV","Inside",24.3111588520839,0.0234359571334089,"Gammarids",NA
+"50","Confluence","EAV","Outside",18.5487094663693,0.01788095592558,"Gammarids",NA
+"51","Confluence","FAV","Inside",274.753725238244,0.264862591129667,"Gammarids",NA
+"52","Confluence","FAV","Outside",210.047133890241,0.202485437070192,"Gammarids",NA
+"53","Confluence","Open Water","Inside",0.939257732302323,0.000905444453939439,"Gammarids",NA
+"54","Confluence","Open Water","Outside",0.698369931715776,0.000673228614174008,"Gammarids",NA
+"55","Confluence","SAV","Inside",610.160664579995,0.588194880655115,"Gammarids",NA
+"56","Confluence","SAV","Outside",461.616676765634,0.444998476402071,"Gammarids",NA
+"57","Decker","EAV","Inside",184.390733300141,0.177752666901336,"Gammarids",NA
+"58","Decker","EAV","Outside",18.2695343488246,0.0176118311122669,"Gammarids",NA
+"59","Decker","FAV","Inside",1910.19417860741,1.84142718817754,"Gammarids",NA
+"60","Decker","FAV","Outside",202.331148048352,0.195047226718612,"Gammarids",NA
+"61","Decker","Open Water","Inside",7.18645027547421,0.00692773806555714,"Gammarids",NA
+"62","Decker","Open Water","Outside",0.680273253543418,0.000655783416415855,"Gammarids",NA
+"63","Decker","SAV","Inside",5005.54223366539,4.82534271325344,"Gammarids",NA
+"64","Decker","SAV","Outside",443.511802378582,0.427545377492953,"Gammarids",NA
+"65","Grizzly Bay","EAV","Inside",25.5361639416739,0.0246168620397737,"Gammarids",NA
+"66","Grizzly Bay","EAV","Outside",12.3335989681457,0.0118895894052925,"Gammarids",NA
+"67","Grizzly Bay","FAV","Inside",260.64204716522,0.251258933467272,"Gammarids",NA
+"68","Grizzly Bay","FAV","Outside",142.771226405716,0.137631462255111,"Gammarids",NA
+"69","Grizzly Bay","Open Water","Inside",0.930277995486818,0.000896787987649292,"Gammarids",NA
+"70","Grizzly Bay","Open Water","Outside",0.446239668532345,0.00043017504046518,"Gammarids",NA
+"71","Grizzly Bay","SAV","Inside",568.033933730593,0.547584712116292,"Gammarids",NA
+"72","Grizzly Bay","SAV","Outside",286.864718159707,0.276537588305958,"Gammarids",NA
+"73","Web Tract Berms","EAV","Inside",35.9730681759838,0.0346780377216484,"Gammarids",NA
+"74","Web Tract Berms","EAV","Outside",37.6545901743485,0.0362990249280719,"Gammarids",NA
+"75","Web Tract Berms","FAV","Inside",401.332695631329,0.386884718588601,"Gammarids",NA
+"76","Web Tract Berms","FAV","Outside",235.276616812911,0.226806658607646,"Gammarids",NA
+"77","Web Tract Berms","Open Water","Inside",1.3940915909568,0.00134390429368235,"Gammarids",NA
+"78","Web Tract Berms","Open Water","Outside",0.720717759679462,0.000694771920331002,"Gammarids",NA
+"79","Web Tract Berms","SAV","Inside",932.626150141968,0.899051608736857,"Gammarids",NA
+"80","Web Tract Berms","SAV","Outside",484.591818213742,0.467146512758047,"Gammarids",NA
+"81","Cache Slough","Open Water","Inside",1887.3642954872,0.0943682147743599,"Cladocera",5327.77140077245
+"82","Cache Slough","Open Water","Outside",1321.18080910631,0.0660590404553157,"Cladocera",2936.5049693551
+"83","Confluence","Open Water","Inside",430.131479681794,0.0215065739840897,"Cladocera",1689.71121143602
+"84","Confluence","Open Water","Outside",306.153259313154,0.0153076629656577,"Cladocera",756.766795354562
+"85","Grizzly Bay","Open Water","Inside",274.22156133695,0.0137110780668475,"Cladocera",1677.12201428789
+"86","Grizzly Bay","Open Water","Outside",502.989086601223,0.0251494543300611,"Cladocera",1671.21287819916
+"87","Cache Slough","Open Water","Inside",1811.12522827513,0.0905562614137565,"OtherCopepods",2615.35130270896
+"88","Cache Slough","Open Water","Outside",1378.51842036969,0.0689259210184844,"OtherCopepods",1539.970468818
+"89","Confluence","Open Water","Inside",662.4815588566,0.03312407794283,"OtherCopepods",777.951301021421
+"90","Confluence","Open Water","Outside",568.891315577319,0.028444565778866,"OtherCopepods",376.073003610485
+"91","Grizzly Bay","Open Water","Inside",414.189140483724,0.0207094570241862,"OtherCopepods",2113.01495420278
+"92","Grizzly Bay","Open Water","Outside",460.776140255705,0.0230388070127853,"OtherCopepods",1542.73409474494
+"93","Cache Slough","Open Water","Inside",246.583564537075,0.000801396584745493,"Limnoithona",11859.8942408378
+"94","Cache Slough","Open Water","Outside",384.754035970766,0.00125045061690499,"Limnoithona",30843.1451478691
+"95","Confluence","Open Water","Inside",637.119412380713,0.00207063809023732,"Limnoithona",22045.1574434686
+"96","Confluence","Open Water","Outside",226.507159543851,0.000736148268517516,"Limnoithona",12290.108329069
+"97","Grizzly Bay","Open Water","Inside",14471.6723060505,0.0470329349946642,"Limnoithona",910537.648175468
+"98","Grizzly Bay","Open Water","Outside",20679.4941501648,0.0672083559880357,"Limnoithona",2096394.35678348
+"99","Cache Slough","Open Water","Inside",177.786373417666,0.0311126153480916,"PredatoryCopepods",2290.72907472517
+"100","Confluence","Open Water","Inside",38.9034334222721,0.00680810084889762,"PredatoryCopepods",317.342533421708
+"101","Grizzly Bay","Open Water","Inside",104.489817463022,0.0182857180560288,"PredatoryCopepods",673.549151237628
+"102","Cache Slough","Open Water","Outside",177.786373417666,0.0311126153480916,"PredatoryCopepods",2290.72907472517
+"103","Confluence","Open Water","Outside",38.9034334222721,0.00680810084889762,"PredatoryCopepods",317.342533421708
+"104","Grizzly Bay","Open Water","Outside",104.489817463022,0.0182857180560288,"PredatoryCopepods",673.549151237628
+"105","Cache Slough","Open Water","Inside",NA,9.1921565767781,"Corbicula",NA
+"106","Confluence","Open Water","Inside",NA,7.70245174789854,"Corbicula",NA
+"107","Decker","Open Water","Inside",NA,24.4467671593097,"Corbicula",NA
+"108","Grizzly Bay","Open Water","Inside",NA,2.01831305144557,"Corbicula",NA
+"109","Web Tract Berms","Open Water","Inside",NA,10.4825751883693,"Corbicula",NA
+"110","Cache Slough","Open Water","Outside",NA,9.1921565767781,"Corbicula",NA
+"111","Confluence","Open Water","Outside",NA,7.70245174789854,"Corbicula",NA
+"112","Decker","Open Water","Outside",NA,24.4467671593097,"Corbicula",NA
+"113","Grizzly Bay","Open Water","Outside",NA,2.01831305144557,"Corbicula",NA
+"114","Web Tract Berms","Open Water","Outside",NA,10.4825751883693,"Corbicula",NA
+"115","Cache Slough","Open Water","Inside",NA,0.248730426826968,"Potamocorbula",NA
+"116","Cache Slough","Open Water","Outside",NA,0.651824691391811,"Potamocorbula",NA
+"117","Confluence","Open Water","Inside",NA,0.332281740584016,"Potamocorbula",NA
+"118","Confluence","Open Water","Outside",NA,0.709451226163246,"Potamocorbula",NA
+"119","Decker","Open Water","Inside",NA,0.252567764267598,"Potamocorbula",NA
+"120","Decker","Open Water","Outside",NA,0.731138939986185,"Potamocorbula",NA
+"121","Grizzly Bay","Open Water","Inside",NA,0.174187854607321,"Potamocorbula",NA
+"122","Grizzly Bay","Open Water","Outside",NA,0.760844208282534,"Potamocorbula",NA
+"123","Web Tract Berms","Open Water","Inside",NA,0.264862323260243,"Potamocorbula",NA
+"124","Web Tract Berms","Open Water","Outside",NA,0.968326842796451,"Potamocorbula",NA

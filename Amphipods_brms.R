@@ -688,6 +688,10 @@ loo(m_corph6, m_corph7, m_corph9, m_corph10, m_corph12, m_corph12.2, m_corph13,
 
 save.image()
 
+#best models and predictions ##################################
+
+
+
 
 #what's up with Decker?
 

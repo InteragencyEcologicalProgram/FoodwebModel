@@ -1,3 +1,4 @@
+Rpath.params = Rosiepath
 
 
 rpath2 = function (Rpath.params, eco.name = NA, eco.area = 1) 
@@ -40,25 +41,26 @@ rpath2 = function (Rpath.params, eco.name = NA, eco.area = 1)
                  model[, PB])
   model[, `:=`(QB, QB.1)]
   model[, `:=`(PB, PB.1)]
+  
   landmat <- model[, (10 + ndead + 1):(10 + ndead + ngear), 
                    with = F]
   discardmat <- model[, (10 + ndead + 1 + ngear):(10 + ndead + 
                                                     (2 * ngear)), with = F]
   totcatchmat <- landmat + discardmat
-  if (is.data.frame(totcatchmat)) {
-    totcatch <- rowSums(totcatchmat)
-    landings <- rowSums(landmat)
-    discards <- rowSums(discardmat)
-    gearland <- colSums(landmat, na.rm = T)
-    geardisc <- colSums(discardmat, na.rm = T)
-  }
-  else {
+  # if (is.data.frame(totcatchmat)) {
+  #   totcatch <- rowSums(totcatchmat)
+  #   landings <- rowSums(landmat)
+  #   discards <- rowSums(discardmat)
+  #   gearland <- colSums(landmat, na.rm = T)
+  #   geardisc <- colSums(discardmat, na.rm = T)
+  # }
+  # else {
     totcatch <- totcatchmat
     landings <- landmat
     discards <- discardmat
     gearland <- sum(landmat, na.rm = T)
     geardisc <- sum(discardmat, na.rm = T)
-  }
+#  }
   geartot <- gearland + geardisc
   model[, `:=`(landings, landings)]
   model[, `:=`(discards, discards)]
@@ -175,7 +177,7 @@ rpath2 = function (Rpath.params, eco.name = NA, eco.area = 1)
   model$BioAcc[is.na(model$BioAcc)] <- 0
   model$Unassim[is.na(model$Unassim)] <- 0
   dietm <- as.matrix(diet)
-  dimnames(dietm) <- list(c(gnames[1:(nliving + ndead)], "Import"), 
+  dimnames(dietm) <- list(c(gnames[1:(nliving+ndead)], "Import"), 
                           gnames[1:nliving])
   dietm[is.na(dietm)] <- 0
   landmatm <- as.matrix(landmat)

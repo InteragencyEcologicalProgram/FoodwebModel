@@ -390,6 +390,16 @@ bmod_chir_full_region <- brm(
   file = here("outputs/bmod_chir_full_region"), file_refit = "on_change"
 )
 
+bmod_coen_full_region <- brm(
+  bf(CPUE ~ Type + Region + Season + Habitat + (1 | Source) + (1 | Year),
+     hu  ~ Type + Region + Season + Habitat + (1 | Source) + (1 | Year)),
+  data = coen_full, family = hurdle_lognormal(), prior = priors_hurdle,
+  chains = 4, iter = 4000, warmup = 1500, cores = 4, seed = 42,
+  control = list(adapt_delta = 0.99),
+  file = here("outputs/bmod_coen_full_region"), file_refit = "on_change"
+)
+
+# Spring-only -----
 bmod_chir_spring_region <- brm(
   bf(CPUE ~ Type + Region + Habitat + (1 | Source) + (1 | Year),
      hu  ~ Type + Region + Habitat + (1 | Source) + (1 | Year)),
@@ -398,15 +408,6 @@ bmod_chir_spring_region <- brm(
   # 1 diverg trans w adapt_delta=0.95, so
   control = list(adapt_delta = 0.99),
   file = here("outputs/bmod_chir_spring_region"), file_refit = "on_change"
-)
-
-bmod_coen_full_region <- brm(
-  bf(CPUE ~ Type + Region + Season + Habitat + (1 | Source) + (1 | Year),
-     hu  ~ Type + Region + Season + Habitat + (1 | Source) + (1 | Year)),
-  data = coen_full, family = hurdle_lognormal(), prior = priors_hurdle,
-  chains = 4, iter = 4000, warmup = 1500, cores = 4, seed = 42,
-  control = list(adapt_delta = 0.99),
-  file = here("outputs/bmod_coen_full_region"), file_refit = "on_change"
 )
 
 bmod_coen_spring_region <- brm(
@@ -418,8 +419,35 @@ bmod_coen_spring_region <- brm(
   file = here("outputs/bmod_coen_spring_region"), file_refit = "on_change"
 )
 
-# side-by-side comparison of shared coefficients (Season excluded --
-# Spring-only model doesn't have it) ----
+## site-level effects -----
+# first look at sample sizes/data availability
+chir_spring %>% group_by(Project_na) %>%
+  summarise(n = n(), prop_zero = mean(CPUE == 0), n_nonzero = sum(CPUE > 0)) %>% arrange(n)
+# looks adequate
+
+coen_spring %>% group_by(Project_na) %>%
+  summarise(n = n(), prop_zero = mean(CPUE == 0), n_nonzero = sum(CPUE > 0)) %>% arrange(n)
+# coenagrionid data from spring-only are too sparse to explore site-level effects;
+# stick with bmod_coen_spring_region
+
+# can we model site-level effects w spring-only data for chironomids?
+bmod_chir_spring_v2 <- brm(
+  bf(CPUE ~ Type + Project_na + Habitat + (1 | Source) + (1 | Year),
+     hu  ~ Type + Project_na + Habitat + (1 | Source) + (1 | Year)),
+  data = chir_spring,
+  family = hurdle_lognormal(),
+  prior = priors_hurdle,
+  chains = 4, iter = 3000, warmup = 1000,
+  cores = 4,
+  seed = 42,
+  control = list(adapt_delta = 0.99, max_treedepth = 12),
+  file = here("outputs/bmod_chir_spring_v2"),
+  file_refit = "on_change"
+)
+
+# save(bmod_chir_v2, bmod_coen_spring_region, file = "outputs/insectmodels_springonly.RData")
+
+## comparison ----
 compare_full_vs_spring <- function(model_full, model_spring, title = NULL) {
   fe <- bind_rows(
     fixef(model_full)   %>% as_tibble(rownames = "term") %>% mutate(Data = "All seasons"),
@@ -444,6 +472,9 @@ compare_full_vs_spring(bmod_chir_full_region, bmod_chir_spring_region,
                        title = "Chironomidae: all seasons vs Spring only (Region)")
 compare_full_vs_spring(bmod_coen_full_region, bmod_coen_spring_region,
                        title = "Coenagrionidae: all seasons vs Spring only (Region)")
+
+summary(bmod_chir_spring_region)
+summary(bmod_coen_spring_region)
 
 # model comparisons ------
 
@@ -475,4 +506,4 @@ bmod_coen_full_region <- add_criterion(bmod_coen_full_region, "loo", reloo = TRU
 
 loo_compare(bmod_coen_full_region, bmod_coen_v1, bmod_coen_v2)
 
-save(bmod_chir_v3, bmod_coen_v2, file = "outputs/insectmodels.RData")
+save(bmod_chir_v2, bmod_coen_v2, file = "outputs/insectmodels.RData")

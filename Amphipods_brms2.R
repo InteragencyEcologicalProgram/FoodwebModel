@@ -1044,6 +1044,7 @@ m_cor14_springC1 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
                         warmup=1000,iter=3000,chains=3,cores=15,thin=10,
                         control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
 
+save.image()
 
 m_cor14_springD1 <- brm(formula =  bf(CPUE ~ Type+Habitat+
                                         (1|Source)+ (1|Project_na)+
@@ -1086,6 +1087,7 @@ m_cor14_spring1 <- brm(formula =  bf(CPUE ~ Type*Region+Habitat+
                        warmup=1000,iter=3000,chains=3,cores=15,thin=10,
                        control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
 
+save.image()
 
 m_cor14_springG1 <- brm(formula =  bf(CPUE ~ Type+Region*Habitat+
                                         (1|Source)+ (1|Project_na)+
@@ -1116,7 +1118,7 @@ m_cor14_spring_null <- brm(formula =  bf(CPUE ~ 1+
                            control=list(adapt_delta=0.99), backend = "cmdstanr", save_pars = save_pars(all = TRUE))
 
 
-
+save.image()
 loo(m_cor14_springA1, mcor14_springB1, m_cor14_springC1, m_cor14_springD1, m_cor14_springE1, 
     m_cor14_springF1, m_cor14_spring1,
     m_cor14_springH1,m_cor14_springG1,m_cor14_spring_null , moment_match = TRUE)
@@ -1145,7 +1147,7 @@ save(m_cor14_springA1, mcor14_springB1, m_cor14_springC1, m_cor14_springD1, m_co
      m_cor14_springH1,m_cor14_springG1,m_cor14_spring_null, m_gam14_springA1, m_gam14_springB1, m_gam14_springC1, m_gam14_springD1, m_gam14_springE1, m_gam14_springF1, m_gam14_spring1,
      m_gam14_springH1,m_gam14_springG1,m_gam14_spring_null, file = "outputs/AmphModelsFinal.RData")
 
-
+save(m_cor14_springD1, m_gam14_spring1, file = "outputs/AmphModels_best.RData")
 #predictions from teh best model ##########################################
 
 #dataset to predict on 
